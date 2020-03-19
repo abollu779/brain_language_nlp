@@ -8,7 +8,7 @@ import nibabel
 from sklearn.metrics.pairwise import euclidean_distances
 from scipy.ndimage.filters import gaussian_filter
 
-from utils.ridge_tools import cross_val_ridge, corr
+from utils.ridge_tools import cross_val_ridge, corr, cross_val_ridge_mlp
 import time as tm
 
     
@@ -131,6 +131,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
     feat_dir = predict_feat_dict['nlp_feat_dir']
     layer = predict_feat_dict['layer']
     seq_len = predict_feat_dict['seq_len']
+    encoding_model = predict_feat_dict['encoding_model']
         
         
     n_words = data.shape[0]
@@ -171,21 +172,25 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
             train_features = train_features[skip:-skip,:]
 
         # normalize data
-        train_data = np.nan_to_num(zscore(np.nan_to_num(train_data)))
-        test_data = np.nan_to_num(zscore(np.nan_to_num(test_data)))
+        train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, 27905)
+        test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, 27905)
         all_test_data.append(test_data)
         
-        train_features = np.nan_to_num(zscore(train_features))
-        test_features = np.nan_to_num(zscore(test_features)) 
-        
-        start_time = tm.time()
-        weights, chosen_lambdas = cross_val_ridge(train_features,train_data, n_splits = 10, lambdas = np.array([10**i for i in range(-6,10)]), method = 'plain',do_plot = False)
+        train_features = np.nan_to_num(zscore(train_features)) # (N_train, 40)
+        test_features = np.nan_to_num(zscore(test_features)) # (N_test, 40)
 
-        preds =  np.dot(test_features, weights)
+        start_time = tm.time()
+        if encoding_model == 'linear':
+            weights, chosen_lambdas = cross_val_ridge(train_features,train_data, n_splits = 10, lambdas = np.array([10**i for i in range(-6,10)]), method = 'plain',do_plot = False)
+            # weights: (40, 27905)
+            preds =  np.dot(test_features, weights) 
+            # preds: (N_test, 27905)
+        else:
+            assert encoding_model == 'mlp'
+            preds = cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, lambdas = np.array([10**i for i in range(-6,10)]))
+            # preds: (N_test, 27905)
         corrs[ind_num,:] = corr(preds,test_data)
         preds_d[test_ind] = preds
-            
-
         print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
         del weights
 

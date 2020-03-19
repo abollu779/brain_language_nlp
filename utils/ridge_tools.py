@@ -3,7 +3,14 @@ import numpy as np
 from sklearn.model_selection import KFold
 from sklearn.linear_model import Ridge, RidgeCV
 import time
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from scipy.stats import zscore
+
+from utils.mlp_encoding_utils import MLPEncodingModel
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def corr(X,Y):
     return np.mean(zscore(X)*zscore(Y),0)
@@ -135,3 +142,118 @@ def cross_val_ridge(train_features,train_data, n_splits = 10,
         plt.imshow(weights,aspect='auto',cmap = 'RdBu_r',vmin = -0.5,vmax = 0.5);
 
     return weights, np.array([lambdas[i] for i in argmin_lambda])
+
+def ridge_grad_descent_pred(model_dict, X, Y, Xtest, min_lmbda, n_epochs=20):
+    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
+    criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=min_lmbda) # adds ridge penalty to above SSE criterion
+
+    X, Y, Xtest = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device), torch.from_numpy(Xtest).float().to(device)
+
+    # Train model with min_lmbda
+    model.train()
+    minibatch_size = model_dict['minibatch_size']
+
+    for epoch in range(n_epochs):
+        permutation = torch.randperm(X.shape[0])
+        epoch_loss = 0
+        for i in range(0, X.shape[0], minibatch_size):
+            optimizer.zero_grad()
+
+            indices = permutation[i:i+minibatch_size]
+            batch_X, batch_Y = X[indices], Y[indices]
+
+            batch_preds = model(batch_X)
+            batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+            epoch_loss += batch_loss
+
+            batch_loss.backward()
+            optimizer.step()
+        
+        print('[MLP Predictions] Epoch: {} | Train Batch Loss: {}'.format(epoch, batch_loss))
+
+    # Compute predictions
+    model.eval()
+    preds_test = model(Xtest)
+    return preds_test
+
+def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas=np.array([0.1,1,10,100,1000]), n_epochs=20):
+    num_lambdas = lambdas.shape[0]
+
+    X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
+    Xval, Yval = torch.from_numpy(Xval).float().to(device), torch.from_numpy(Yval).float().to(device)
+
+    cost = torch.zeros((num_lambdas, ))
+    for idx,lmbda in enumerate(lambdas):
+        model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
+        criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
+        optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=lmbda) # adds ridge penalty to above SSE criterion
+
+        # Train model with current lambda
+        min_loss, n_epochs_without_improvement, n_epochs_min_loss = None, 0, 0
+        minibatch_size = model_dict['minibatch_size']
+
+        for epoch in range(n_epochs):
+            # Train for an epoch
+            model.train()
+            permutation = torch.randperm(X.shape[0])
+            epoch_loss = 0
+            for i in range(0, X.shape[0], minibatch_size):
+                optimizer.zero_grad()
+
+                indices = permutation[i:i+minibatch_size]
+                batch_X, batch_Y = X[indices], Y[indices]
+
+                batch_preds = model(batch_X)
+                batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+                epoch_loss += batch_loss.item()
+
+                batch_loss.backward()
+                optimizer.step()
+            
+            print('[MLP Training] Lambda: {} | Epoch: {} | Train Loss: {}'.format(lmbda, epoch, epoch_loss))
+
+            # Validation loss for current epoch
+            model.eval()
+            preds_val = model(Xval)
+            val_loss = criterion(preds_val, Yval)
+            print('[MLP Validation] Lambda: {} | Epoch: {} | Val Loss: {}'.format(lmbda, epoch, val_loss))
+            cost[idx] = val_loss
+
+            ## Early stopping if required
+            if min_loss is None or val_loss >= min_loss:
+                n_epochs_without_improvement += 1
+                if n_epochs_without_improvement == 3:
+                    break
+            else:
+                n_epochs_without_improvement = 0
+                min_loss = val_loss
+                n_epochs_min_loss = epoch
+            ##
+
+    return min_loss, n_epochs_min_loss
+
+def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, n_epochs=20,
+                        lambdas = np.array([10**i for i in range(-6,10)])):
+    input_size, hidden_size, output_size = train_features.shape[1], 16, 1 # 40, 16, 1
+    model_dict = dict(input_size=input_size, hidden_size=hidden_size, output_size=output_size, minibatch_size=train_data.shape[0]//10)
+
+    num_voxels = train_data.shape[1]
+    num_lambdas = lambdas.shape[0]
+
+    preds_all = torch.zeros((test_features.shape[0], num_voxels)) # (N_test, 27905)
+    kf = KFold(n_splits=n_splits)
+    start_t = time.time()
+    for ivox in range(num_voxels):
+        r_cv = torch.zeros((num_lambdas,))
+        curr_n_epochs = np.zeros((n_splits, ))
+        for icv, (trn, val) in enumerate(kf.split(train_data)):
+            cost, curr_n_epochs[icv] = ridge_by_lambda_grad_descent(model_dict, train_features[trn], train_data[trn][:, ivox],
+                                                train_features[val], train_data[val][:, ivox],
+                                                lambdas=lambdas) # cost: (num_lambdas, )
+            r_cv += cost
+        argmin_lambda = np.argmin(r_cv)
+        avg_n_epochs = np.mean(curr_n_epochs)
+        preds = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, argmin_lambda, avg_n_epochs) # preds: (27905, )
+        preds_all[ivox] = preds
+    return preds_all

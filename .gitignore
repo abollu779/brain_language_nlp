@@ -1,0 +1,6 @@
+data/fMRI
+data/voxel_neighborhoods
+encoder_preds/
+nlp_features/
+final_accs/
+utils/__pycache__/*
