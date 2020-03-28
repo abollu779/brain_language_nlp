@@ -147,6 +147,7 @@ def cross_val_ridge(train_features,train_data, n_splits = 10,
 
 def ridge_grad_descent_pred(model_dict, X, Y, Xtest, opt_lmbda, opt_lr, n_epochs=20):
     model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
+    model = model.to(device)
     criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
     optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda) # adds ridge penalty to above SSE criterion
 
@@ -188,6 +189,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_e
     cost = np.zeros((num_lambdas, ))
     for idx,lmbda in enumerate(lambdas):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
+        model = model.to(device)
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
         optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3) # if no improvement seen in val_loss for 3 epochs, reduces lr
