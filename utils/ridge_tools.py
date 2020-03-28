@@ -13,6 +13,7 @@ from utils.mlp_encoding_utils import MLPEncodingModel
 import pdb
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print("Device: ", device)
 
 def corr(X,Y):
     return np.mean(zscore(X)*zscore(Y),0)
