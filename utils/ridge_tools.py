@@ -10,6 +10,8 @@ from scipy.stats import zscore
 
 from utils.mlp_encoding_utils import MLPEncodingModel
 
+import pdb
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def corr(X,Y):
@@ -143,10 +145,10 @@ def cross_val_ridge(train_features,train_data, n_splits = 10,
 
     return weights, np.array([lambdas[i] for i in argmin_lambda])
 
-def ridge_grad_descent_pred(model_dict, X, Y, Xtest, min_lmbda, n_epochs=20):
+def ridge_grad_descent_pred(model_dict, X, Y, Xtest, opt_lmbda, opt_lr, n_epochs=20):
     model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
     criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=min_lmbda) # adds ridge penalty to above SSE criterion
+    optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda) # adds ridge penalty to above SSE criterion
 
     X, Y, Xtest = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device), torch.from_numpy(Xtest).float().to(device)
 
@@ -170,28 +172,29 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, min_lmbda, n_epochs=20):
             batch_loss.backward()
             optimizer.step()
         
-        print('[MLP Predictions] Epoch: {} | Train Batch Loss: {}'.format(epoch, batch_loss))
+        print('[MLP Predictions] Epoch: {} | Train Loss: {}'.format(epoch, epoch_loss))
 
     # Compute predictions
     model.eval()
     preds_test = model(Xtest)
     return preds_test
 
-def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas=np.array([0.1,1,10,100,1000]), n_epochs=20):
+def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_epochs=20):
     num_lambdas = lambdas.shape[0]
 
     X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
     Xval, Yval = torch.from_numpy(Xval).float().to(device), torch.from_numpy(Yval).float().to(device)
 
-    cost = torch.zeros((num_lambdas, ))
+    cost = np.zeros((num_lambdas, ))
     for idx,lmbda in enumerate(lambdas):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
-        optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=lmbda) # adds ridge penalty to above SSE criterion
+        optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3) # if no improvement seen in val_loss for 3 epochs, reduces lr
 
         # Train model with current lambda
-        min_loss, n_epochs_without_improvement, n_epochs_min_loss = None, 0, 0
         minibatch_size = model_dict['minibatch_size']
+        min_loss = None
 
         for epoch in range(n_epochs):
             # Train for an epoch
@@ -206,54 +209,50 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas=np.array(
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
-                epoch_loss += batch_loss.item()
 
                 batch_loss.backward()
                 optimizer.step()
+                epoch_loss += batch_loss.item()
             
-            print('[MLP Training] Lambda: {} | Epoch: {} | Train Loss: {}'.format(lmbda, epoch, epoch_loss))
+            # print('[MLP Training] Lambda: {} | Epoch: {} | Train Loss: {}'.format(lmbda, epoch, epoch_loss))
 
             # Validation loss for current epoch
             model.eval()
             preds_val = model(Xval)
-            val_loss = criterion(preds_val, Yval)
-            print('[MLP Validation] Lambda: {} | Epoch: {} | Val Loss: {}'.format(lmbda, epoch, val_loss))
-            cost[idx] = val_loss
+            val_loss = criterion(preds_val.squeeze(), Yval)
+            # print('[MLP Validation] Lambda: {} | Epoch: {} | Val Loss: {}'.format(lmbda, epoch, val_loss.item()))
 
-            ## Early stopping if required
-            if min_loss is None or val_loss >= min_loss:
-                n_epochs_without_improvement += 1
-                if n_epochs_without_improvement == 3:
-                    break
-            else:
-                n_epochs_without_improvement = 0
+            scheduler.step(val_loss)
+
+            if min_loss is None or val_loss < min_loss:
                 min_loss = val_loss
-                n_epochs_min_loss = epoch
-            ##
-
-    return min_loss, n_epochs_min_loss
+            cost[idx] = min_loss.item()
+    
+    return cost
 
 def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, n_epochs=20,
-                        lambdas = np.array([10**i for i in range(-6,10)])):
-    input_size, hidden_size, output_size = train_features.shape[1], 16, 1 # 40, 16, 1
-    model_dict = dict(input_size=input_size, hidden_size=hidden_size, output_size=output_size, minibatch_size=train_data.shape[0]//10)
+                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
+    input_size, hidden_size, output_size = train_features.shape[1], 16, 1 # feat_dim, 16, 1
+    model_dict = dict(input_size=input_size, hidden_size=hidden_size, output_size=output_size, minibatch_size=train_data.shape[0]//n_splits)
 
     num_voxels = train_data.shape[1]
     num_lambdas = lambdas.shape[0]
 
-    preds_all = torch.zeros((test_features.shape[0], num_voxels)) # (N_test, 27905)
+    preds_all = torch.zeros((num_voxels, test_features.shape[0])) # (num_voxels, N_test) reshaped again before returning
     kf = KFold(n_splits=n_splits)
     start_t = time.time()
     for ivox in range(num_voxels):
-        r_cv = torch.zeros((num_lambdas,))
-        curr_n_epochs = np.zeros((n_splits, ))
+        r_cv = np.zeros((num_lambdas,))
         for icv, (trn, val) in enumerate(kf.split(train_data)):
-            cost, curr_n_epochs[icv] = ridge_by_lambda_grad_descent(model_dict, train_features[trn], train_data[trn][:, ivox],
+            # print("====================== Sub-Fold: {} ======================".format(icv))
+            cost = ridge_by_lambda_grad_descent(model_dict, train_features[trn], train_data[trn][:, ivox],
                                                 train_features[val], train_data[val][:, ivox],
-                                                lambdas=lambdas) # cost: (num_lambdas, )
+                                                lambdas=lambdas, lrs=lrs) # cost: (num_lambdas, )
             r_cv += cost
         argmin_lambda = np.argmin(r_cv)
-        avg_n_epochs = np.mean(curr_n_epochs)
-        preds = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, argmin_lambda, avg_n_epochs) # preds: (27905, )
-        preds_all[ivox] = preds
+        opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
+        print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
+        preds = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, opt_lambda, opt_lr) # preds: (N_test, 1)
+        preds_all[ivox] = preds.squeeze()
+    preds_all = preds_all.T # (N_test, num_voxels)
     return preds_all

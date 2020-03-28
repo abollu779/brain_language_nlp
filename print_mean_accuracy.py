@@ -10,4 +10,6 @@ if __name__ == '__main__':
 
 loaded = pk.load(open('{}_accs.pkl'.format(args.input_path), 'rb'))
 mean_subj_acc_across_folds = loaded.mean(0)
-print("Mean Accuracy Across Folds: {}".format(mean_subj_acc_across_folds))
+print("Mean Accuracy Across Folds:")
+for i in range(len(mean_subj_acc_across_folds)):
+    print("{}: {}".format(i, mean_subj_acc_across_folds[i]))

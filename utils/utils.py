@@ -172,12 +172,12 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
             train_features = train_features[skip:-skip,:]
 
         # normalize data
-        train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, 27905)
-        test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, 27905)
+        train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
+        test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
         all_test_data.append(test_data)
         
-        train_features = np.nan_to_num(zscore(train_features)) # (N_train, 40)
-        test_features = np.nan_to_num(zscore(test_features)) # (N_test, 40)
+        train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
+        test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
 
         start_time = tm.time()
         if encoding_model == 'linear':
@@ -194,6 +194,8 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
         print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
         del weights
 
+    import pdb
+    pdb.set_trace()
     return corrs, acc, acc_std, preds_d, np.vstack(all_test_data)
 
 def binary_classify_neighborhoods(Ypred, Y, n_class=20, nSample = 1000,pair_samples = [],neighborhoods=[]):
