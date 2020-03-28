@@ -11,6 +11,7 @@ from scipy.stats import zscore
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 import pdb
+import time
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
@@ -257,5 +258,9 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, 
         print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
         preds = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, opt_lambda, opt_lr) # preds: (N_test, 1)
         preds_all[ivox] = preds.squeeze()
+        if (ivox < 3): # Record time taken for the first three voxels
+            end_t = time.time()
+            print("Time Taken: %fs" % (end_t - start_t))
+            start_t = end_t
     preds_all = preds_all.T # (N_test, num_voxels)
     return preds_all
