@@ -181,9 +181,9 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
 
         start_time = tm.time()
         if encoding_model == 'linear':
-            weights, chosen_lambdas = cross_val_ridge(train_features,train_data, n_splits = 10, lambdas = np.array([10**i for i in range(-6,10)]), method = 'plain',do_plot = False)
+            weights, chosen_lambdas = cross_val_ridge(train_features,train_data, n_splits = 10, lambdas = np.array([10**i for i in (3,4)]), method = 'plain',do_plot = False)
             # weights: (40, 27905)
-            preds =  np.dot(test_features, weights) 
+            preds =  np.dot(test_features, weights)
             # preds: (N_test, 27905)
         else:
             assert encoding_model == 'mlp'
