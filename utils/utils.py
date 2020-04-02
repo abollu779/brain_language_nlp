@@ -187,15 +187,15 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
             # preds: (N_test, 27905)
         else:
             assert encoding_model == 'mlp'
-            preds = cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, lambdas = np.array([10**i for i in range(-6,10)]))
+            preds = cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, lambdas = np.array([10**i for i in (3,4)]), lrs = np.array([1e-4,1e-4]))
             # preds: (N_test, 27905)
+        import pdb
+        pdb.set_trace()
         corrs[ind_num,:] = corr(preds,test_data)
         preds_d[test_ind] = preds
         print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
         del weights
 
-    import pdb
-    pdb.set_trace()
     return corrs, acc, acc_std, preds_d, np.vstack(all_test_data)
 
 def binary_classify_neighborhoods(Ypred, Y, n_class=20, nSample = 1000,pair_samples = [],neighborhoods=[]):

@@ -147,7 +147,7 @@ def cross_val_ridge(train_features,train_data, n_splits = 10,
 
     return weights, np.array([lambdas[i] for i in argmin_lambda])
 
-def ridge_grad_descent_pred(model_dict, X, Y, Xtest, opt_lmbda, opt_lr, n_epochs=20):
+def ridge_grad_descent_pred(model_dict, X, Y, Xtest, opt_lmbda, opt_lr, n_epochs=10):
     model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
@@ -175,14 +175,15 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, opt_lmbda, opt_lr, n_epochs
             batch_loss.backward()
             optimizer.step()
         
-        print('[MLP Predictions] Epoch: {} | Train Loss: {}'.format(epoch, epoch_loss))
+        if epoch == n_epochs - 1:
+            print('[MLP Predictions] Epoch: {} | Train Loss: {}'.format(epoch, epoch_loss))
 
     # Compute predictions
     model.eval()
     preds_test = model(Xtest)
     return preds_test
 
-def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_epochs=20):
+def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_epochs=10):
     num_lambdas = lambdas.shape[0]
 
     X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
@@ -231,10 +232,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_e
             if min_loss is None or val_loss < min_loss:
                 min_loss = val_loss
             cost[idx] = min_loss.item()
-    
+
     return cost
 
-def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, n_epochs=20,
+def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, n_epochs=10,
                         lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
     input_size, hidden_size, output_size = train_features.shape[1], 16, 1 # feat_dim, 16, 1
     model_dict = dict(input_size=input_size, hidden_size=hidden_size, output_size=output_size, minibatch_size=train_data.shape[0]//n_splits)
@@ -258,9 +259,9 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, 
         print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
         preds = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, opt_lambda, opt_lr) # preds: (N_test, 1)
         preds_all[ivox] = preds.squeeze()
-        if (ivox < 3): # Record time taken for the first three voxels
+        if (ivox%1000 == 0): # Record time taken for the first three voxels
             end_t = time.time()
-            print("Time Taken: %fs" % (end_t - start_t))
+            print("Time Taken for prev 1000 vox: %fs" % (end_t - start_t))
             start_t = end_t
     preds_all = preds_all.T # (N_test, num_voxels)
     return preds_all
