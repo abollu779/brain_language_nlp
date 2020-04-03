@@ -175,8 +175,8 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, opt_lmbda, opt_lr, n_epochs
             batch_loss.backward()
             optimizer.step()
         
-        if epoch == n_epochs - 1:
-            print('[MLP Predictions] Epoch: {} | Train Loss: {}'.format(epoch, epoch_loss))
+        # if epoch == n_epochs - 1:
+            # print('[MLP Predictions] Epoch: {} | Train Loss: {}'.format(epoch, epoch_loss))
 
     # Compute predictions
     model.eval()
@@ -232,7 +232,6 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_e
             if min_loss is None or val_loss < min_loss:
                 min_loss = val_loss
             cost[idx] = min_loss.item()
-
     return cost
 
 def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, n_epochs=10,
@@ -245,7 +244,9 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, 
 
     preds_all = torch.zeros((num_voxels, test_features.shape[0])) # (num_voxels, N_test) reshaped again before returning
     kf = KFold(n_splits=n_splits)
-    start_t = time.time()
+
+    # DEBUG
+    num_voxels = 2
     for ivox in range(num_voxels):
         r_cv = np.zeros((num_lambdas,))
         for icv, (trn, val) in enumerate(kf.split(train_data)):
@@ -256,12 +257,13 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, 
             r_cv += cost
         argmin_lambda = np.argmin(r_cv)
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
-        print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
+        # print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
         preds = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, opt_lambda, opt_lr) # preds: (N_test, 1)
         preds_all[ivox] = preds.squeeze()
-        if (ivox%1000 == 0): # Record time taken for the first three voxels
-            end_t = time.time()
-            print("Time Taken for prev 1000 vox: %fs" % (end_t - start_t))
-            start_t = end_t
+        # if (ivox%1000 == 0): # Record time taken for the first three voxels
+        #     end_t = time.time()
+        #     print("Time Taken for prev 1000 vox: %fs" % (end_t - start_t))
+        #     start_t = end_t
     preds_all = preds_all.T # (N_test, num_voxels)
+    pdb.set_trace()
     return preds_all
