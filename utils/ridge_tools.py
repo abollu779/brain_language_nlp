@@ -251,19 +251,19 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, 
     for ivox in range(num_voxels):
         r_cv = np.zeros((num_lambdas,))
         for icv, (trn, val) in enumerate(kf.split(train_data)):
-            # print("====================== Sub-Fold: {} ======================".format(icv))
+            # s_t = time.time()
             cost = ridge_by_lambda_grad_descent(model_dict, train_features[trn], train_data[trn][:, ivox],
                                                 train_features[val], train_data[val][:, ivox],
                                                 lambdas=lambdas, lrs=lrs) # cost: (num_lambdas, )
+            # print("Grad Descent Time: %f" % (time.time()-s_t))
             r_cv += cost
         argmin_lambda = np.argmin(r_cv)
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
         # print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
         preds = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, opt_lambda, opt_lr) # preds: (N_test, 1)
         preds_all[ivox] = preds.squeeze()
-        end_t = time.time()
-        print("Time Taken for vox: %fs" % (end_t - start_t))
-        start_t = end_t
+        # end_t = time.time()
+        # print("Time Taken for vox: %fs" % (end_t - start_t))
+        # start_t = end_t
     preds_all = preds_all.T # (N_test, num_voxels)
-    pdb.set_trace()
     return preds_all
