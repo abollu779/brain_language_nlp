@@ -197,8 +197,6 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
         corrs[ind_num,:] = corr(preds,test_data)
         preds_d[test_ind] = preds
         print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
-        import pdb
-        pdb.set_trace()
 
     return corrs, acc, acc_std, preds_d, np.vstack(all_test_data)
 

@@ -9,9 +9,11 @@ import torch.optim as optim
 from scipy.stats import zscore
 
 from utils.mlp_encoding_utils import MLPEncodingModel
+import utils.utils as general_utils
 
 import pdb
 import time
+from numba import jit
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
@@ -243,19 +245,23 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, 
     num_lambdas = lambdas.shape[0]
 
     preds_all = torch.zeros((num_voxels, test_features.shape[0])) # (num_voxels, N_test) reshaped again before returning
-    kf = KFold(n_splits=n_splits)
+
+    ind = general_utils.CV_ind(train_data.shape[0], n_folds=n_splits)
     start_t = time.time()
 
     # DEBUG
     num_voxels = 2
     for ivox in range(num_voxels):
         r_cv = np.zeros((num_lambdas,))
-        for icv, (trn, val) in enumerate(kf.split(train_data)):
+        for ind_num in range(n_splits):
+            trn = ind!=ind_num
+            val = ind==ind_num
             # s_t = time.time()
-            cost = ridge_by_lambda_grad_descent(model_dict, train_features[trn], train_data[trn][:, ivox],
-                                                train_features[val], train_data[val][:, ivox],
-                                                lambdas=lambdas, lrs=lrs) # cost: (num_lambdas, )
+            X, Y = train_features[trn], train_data[trn][:, ivox]
+            Xval, Yval = train_features[val], train_data[val][:, ivox]
             # print("Grad Descent Time: %f" % (time.time()-s_t))
+            cost = ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval,
+                                                lambdas=lambdas, lrs=lrs) # cost: (num_lambdas, )
             r_cv += cost
         argmin_lambda = np.argmin(r_cv)
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
