@@ -3,5 +3,6 @@ data/voxel_neighborhoods
 encoder_preds/
 nlp_features/
 final_accs/
+mlp_fold_preds/
 plots/
 utils/__pycache__/*

@@ -40,10 +40,10 @@ if __name__ == '__main__':
     if n_class < 20:
         fname = fname + '_{}v{}_'.format(n_class,n_class)
 
-    with open(fname + '_accs.pkl','wb') as fout:
+    with open(fname + '_accs_ROI.pkl','wb') as fout:
         pk.dump(accs,fout)
 
-    print('saved: {}'.format(fname + '_accs.pkl'))
+    print('saved: {}'.format(fname + '_accs_ROI.pkl'))
 
 
     

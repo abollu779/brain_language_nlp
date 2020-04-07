@@ -28,6 +28,10 @@ if __name__ == '__main__':
     # loading fMRI data
     data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
 
+    # limit to ROI data
+    rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
+    data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
+
     corrs_t, _, _, preds_t, test_t = run_class_time_CV_fmri_crossval_ridge(data,
                                                                 predict_feat_dict)
 

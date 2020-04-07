@@ -8,7 +8,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-loaded = pk.load(open('{}_accs.pkl'.format(args.input_path), 'rb'))
+loaded = pk.load(open('{}_accs_ROI.pkl'.format(args.input_path), 'rb'))
 mean_subj_acc_across_folds = loaded.mean(0)
 print("Mean Accuracy Across Folds:")
 for i in range(len(mean_subj_acc_across_folds)):
