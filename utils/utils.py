@@ -188,12 +188,13 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
             del weights
         else:
             assert encoding_model == 'mlp'
-            s_t = tm.time()
-            preds = cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, lambdas = np.array([10**i for i in (3,4)]), lrs = np.array([1e-4,1e-4]))
-            mlp_time = tm.time() - s_t
-            print("MLP Training: %fs" % (mlp_time))
-            # preds: (N_test, 27905)
-            preds = preds.detach().numpy()
+            # s_t = tm.time()
+            # preds = cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, lambdas = np.array([10**i for i in (3,4)]), lrs = np.array([1e-4,1e-4]))
+            # mlp_time = tm.time() - s_t
+            # print("MLP Training: %fs" % (mlp_time))
+            # # preds: (N_test, 27905)
+            # preds = preds.detach().numpy()
+            preds = np.load('mlp_fold_preds/fold_{}.npy'.format(ind_num))
         corrs[ind_num,:] = corr(preds,test_data)
         preds_d[test_ind] = preds
         print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
