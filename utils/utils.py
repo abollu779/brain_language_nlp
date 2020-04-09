@@ -194,7 +194,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
             # print("MLP Training: %fs" % (mlp_time))
             # # preds: (N_test, 27905)
             # preds = preds.detach().numpy()
-            preds = np.load('mlp_fold_preds/fold_{}.npy'.format(ind_num))
+            preds = np.load('mlp_fold_preds/subject_H/fold_{}.npy'.format(ind_num)) # Change subject folder if needed!!!
         corrs[ind_num,:] = corr(preds,test_data)
         preds_d[test_ind] = preds
         print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))

@@ -14,49 +14,66 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-#################################### ACCURACIES TO PLOT #################################################
-linear_accs = pk.load(open('final_accs/acc_{}_with_bert_layer_1_len_1_encoder_linear_accs_ROI.pkl'.format(args.subject), 'rb'))
-mlp_accs = pk.load(open('final_accs/acc_{}_with_bert_layer_1_len_1_encoder_mlp_accs_ROI.pkl'.format(args.subject), 'rb'))
+#################################### CORRELATION/ACCURACIES TO PLOT #################################################
+# linear_accs = pk.load(open('final_accs/acc_{}_with_bert_layer_1_len_1_encoder_linear_accs_ROI.pkl'.format(args.subject), 'rb'))
+# mlp_accs = pk.load(open('final_accs/acc_{}_with_bert_layer_1_len_1_encoder_mlp_accs_ROI.pkl'.format(args.subject), 'rb'))
 
-linear_accs_avg = linear_accs.mean()
-mlp_accs_avg = mlp_accs.mean()
+# linear_accs_avg = linear_accs.mean(0)
+# mlp_accs_avg = mlp_accs.mean(0)
 
-X = linear_accs_avg
-Y = mlp_accs_avg
+# rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
+# linear_accs_avg = linear_accs_avg[np.where(rois.item()[args.subject]['all'] == 1)[0]]
+# mlp_accs_avg = mlp_accs_avg[np.where(rois.item()[args.subject]['all'] == 1)[0]]
+
+linear_output = np.load('encoder_preds/predict_{}_with_bert_layer_1_len_1_encoder_linear.npy'.format(args.subject), allow_pickle=True)
+mlp_output = np.load('encoder_preds/predict_{}_with_bert_layer_1_len_1_encoder_mlp.npy'.format(args.subject), allow_pickle=True)
+
+linear_corrs = linear_output.item()['corrs_t']
+mlp_corrs = mlp_output.item()['corrs_t']
+
+linear_corrs_avg = np.nanmean(linear_corrs, axis=0)
+mlp_corrs_avg = np.nanmean(mlp_corrs, axis=0)
+
+X = linear_corrs_avg
+Y = mlp_corrs_avg
 
 rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
-if args.voxels_type == 'ALL ROI':
-    X = np.ma.masked_equal(rois.item()[args.subject]['all'] * linear_accs_avg, 0).compressed()
-    Y = np.ma.masked_equal(rois.item()[args.subject]['all'] * mlp_accs_avg, 0).compressed()
-elif args.voxels_type == 'POSTTEMP':
-    X = np.ma.masked_equal(rois.item()[args.subject]['PostTemp'] * linear_accs_avg, 0).compressed()
-    Y = np.ma.masked_equal(rois.item()[args.subject]['PostTemp'] * mlp_accs_avg, 0).compressed()
-elif args.voxels_type == 'ANTTEMP':
-    X = np.ma.masked_equal(rois.item()[args.subject]['AntTemp'] * linear_accs_avg, 0).compressed()
-    Y = np.ma.masked_equal(rois.item()[args.subject]['AntTemp'] * mlp_accs_avg, 0).compressed()
-elif args.voxels_type == 'ANGULARG':
-    X = np.ma.masked_equal(rois.item()[args.subject]['AngularG'] * linear_accs_avg, 0).compressed()
-    Y = np.ma.masked_equal(rois.item()[args.subject]['AngularG'] * mlp_accs_avg, 0).compressed()
-elif args.voxels_type == 'IFG':
-    X = np.ma.masked_equal(rois.item()[args.subject]['IFG'] * linear_accs_avg, 0).compressed()
-    Y = np.ma.masked_equal(rois.item()[args.subject]['IFG'] * mlp_accs_avg, 0).compressed()
-elif args.voxels_type == 'MFG':
-    X = np.ma.masked_equal(rois.item()[args.subject]['MFG'] * linear_accs_avg, 0).compressed()
-    Y = np.ma.masked_equal(rois.item()[args.subject]['MFG'] * mlp_accs_avg, 0).compressed()
-elif args.voxels_type == 'IFGORB':
-    X = np.ma.masked_equal(rois.item()[args.subject]['IFGorb'] * linear_accs_avg, 0).compressed()
-    Y = np.ma.masked_equal(rois.item()[args.subject]['IFGorb'] * mlp_accs_avg, 0).compressed()
-elif args.voxels_type == 'PCINGULATE':
-    X = np.ma.masked_equal(rois.item()[args.subject]['pCingulate'] * linear_accs_avg, 0).compressed()
-    Y = np.ma.masked_equal(rois.item()[args.subject]['pCingulate'] * mlp_accs_avg, 0).compressed()
-elif args.voxels_type == 'DMPFC':
-    X = np.ma.masked_equal(rois.item()[args.subject]['dmpfc'] * linear_accs_avg, 0).compressed()
-    Y = np.ma.masked_equal(rois.item()[args.subject]['dmpfc'] * mlp_accs_avg, 0).compressed()
+
+if args.voxels_type == 'ALLROI':
+    X = np.ma.masked_equal(linear_corrs_avg, 0).compressed()
+    Y = np.ma.masked_equal(mlp_corrs_avg, 0).compressed()
+else:
+    if args.voxels_type == 'POSTTEMP':
+        mask = rois.item()[args.subject]['PostTemp'][np.where(rois.item()[args.subject]['all'] > 0)[0]]
+    elif args.voxels_type == 'ANTTEMP':
+        mask = rois.item()[args.subject]['AntTemp'][np.where(rois.item()[args.subject]['all'] > 0)[0]]
+    elif args.voxels_type == 'ANGULARG':
+        mask = rois.item()[args.subject]['AngularG'][np.where(rois.item()[args.subject]['all'] > 0)[0]]
+    elif args.voxels_type == 'IFG':
+        mask = rois.item()[args.subject]['IFG'][np.where(rois.item()[args.subject]['all'] > 0)[0]]
+    elif args.voxels_type == 'MFG':
+        mask = rois.item()[args.subject]['MFG'][np.where(rois.item()[args.subject]['all'] > 0)[0]]
+    elif args.voxels_type == 'IFGORB':
+        mask = rois.item()[args.subject]['IFGorb'][np.where(rois.item()[args.subject]['all'] > 0)[0]]
+    elif args.voxels_type == 'PCINGULATE':
+        mask = rois.item()[args.subject]['pCingulate'][np.where(rois.item()[args.subject]['all'] > 0)[0]]
+    elif args.voxels_type == 'DMPFC':
+        mask = rois.item()[args.subject]['dmpfc'][np.where(rois.item()[args.subject]['all'] > 0)[0]]
+    X = np.ma.masked_equal(mask * linear_corrs_avg, 0).compressed()
+    Y = np.ma.masked_equal(mask * mlp_corrs_avg, 0).compressed()
 ##############################################################################################################
 
-def plot_accuracies(X, Y, subject, voxels_type):
-    slope, y_intercept = np.polyfit(X, Y, deg=1)
-    x_0, y_0, x_1, y_1 = 0, y_intercept, 1, slope+y_intercept
+def plot_correlations(X, Y, subject, voxels_type):
+    X = np.delete(X, np.where(np.isnan(Y) == 1), 0)
+    Y = np.delete(Y, np.where(np.isnan(Y) == 1), 0)
+
+    # Best fit line data
+    X_above_zero = X[(X > 0) & (Y > 0)]
+    Y_above_zero = Y[(X > 0) & (Y > 0)]
+    xmin = X_above_zero.min()
+    xmax = X_above_zero.max()
+    slope, y_intercept = np.polyfit(X_above_zero, Y_above_zero, deg=1)
+    x_0, y_0, x_1, y_1 = xmin, slope*xmin+y_intercept, xmax, slope*xmax+y_intercept
 
     fig, ax = plt.subplots()
     ax.scatter(X, Y)
@@ -64,15 +81,46 @@ def plot_accuracies(X, Y, subject, voxels_type):
     bf_line = mlines.Line2D([x_0, x_1], [y_0, y_1], color='black')
     line = mlines.Line2D([0, 1], [0, 1], color='red')
     transform = ax.transAxes
+    # bf_line.set_transform(transform)
     line.set_transform(transform)
-    bf_line.set_transform(transform)
 
-    ax.add_line(line)
     ax.add_line(bf_line)
+    ax.add_line(line)
 
-    plt.title('{} Voxels Scatterplot'.format(voxels_type))
+    plt.title('Correlations: Subject {} - {} Voxels'.format(subject, voxels_type))
+    plt.xlabel('Linear corrs')
+    plt.ylabel('MLP corrs')
+    plt.xlim(-0.25, 0.5)
+    plt.ylim(-0.25, 0.5)
+    plt.savefig('plots/corrs_{}_subject_{}.png'.format(voxels_type, subject))
+
+def plot_accuracies(X, Y, subject, voxels_type):
+    X = np.delete(X, np.where(np.isnan(Y) == 1), 0)
+    Y = np.delete(Y, np.where(np.isnan(Y) == 1), 0)
+
+    # Best fit line data
+    xmin = X.min()
+    xmax = X.max()
+    slope, y_intercept = np.polyfit(X, Y, deg=1)
+    x_0, y_0, x_1, y_1 = xmin, slope*xmin+y_intercept, xmax, slope*xmax+y_intercept
+
+    fig, ax = plt.subplots()
+    ax.scatter(X, Y)
+
+    bf_line = mlines.Line2D([x_0, x_1], [y_0, y_1], color='black')
+    line = mlines.Line2D([0, 1], [0, 1], color='red')
+    transform = ax.transAxes
+    # bf_line.set_transform(transform)
+    line.set_transform(transform)
+
+    ax.add_line(bf_line)
+    ax.add_line(line)
+
+    plt.title('Accuracies: Subject {} - {} Voxels'.format(subject, voxels_type))
     plt.xlabel('Linear accs')
     plt.ylabel('MLP accs')
-    plt.savefig('plots/subject_{}_{}.png'.format(subject, voxels_type))
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.savefig('plots/accs_{}_subject_{}.png'.format(voxels_type, subject))
 
 plot_accuracies(X, Y, args.subject, args.voxels_type)

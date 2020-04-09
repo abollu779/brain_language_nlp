@@ -249,8 +249,6 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, 
     ind = general_utils.CV_ind(train_data.shape[0], n_folds=n_splits)
     start_t = time.time()
 
-    # DEBUG
-    num_voxels = 2
     for ivox in range(num_voxels):
         r_cv = np.zeros((num_lambdas,))
         for ind_num in range(n_splits):

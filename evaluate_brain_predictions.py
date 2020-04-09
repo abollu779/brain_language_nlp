@@ -25,6 +25,8 @@ if __name__ == '__main__':
     n_folds = 4
     
     neighborhoods = np.load('./data/voxel_neighborhoods/' + args.subject + '_ars_auto2.npy')
+    # rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
+    # neighborhoods = neighborhoods[np.where(rois.item()[args.subject]['all'] == 1)[0]]
     n_words, n_voxels = test_t_per_feat.shape
     ind = CV_ind(n_words, n_folds=n_folds)
 
