@@ -9,11 +9,10 @@ import torch.optim as optim
 from scipy.stats import zscore
 
 from utils.mlp_encoding_utils import MLPEncodingModel
-import utils.utils as general_utils
 
 import pdb
 import time
-from numba import jit
+# from numba import jit
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
@@ -149,19 +148,21 @@ def cross_val_ridge(train_features,train_data, n_splits = 10,
 
     return weights, np.array([lambdas[i] for i in argmin_lambda])
 
-def ridge_grad_descent_pred(model_dict, X, Y, Xtest, opt_lmbda, opt_lr, n_epochs=10):
+def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, n_epochs):
     model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
     optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda) # adds ridge penalty to above SSE criterion
 
-    X, Y, Xtest = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device), torch.from_numpy(Xtest).float().to(device)
+    X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
+    Xtest, Ytest = torch.from_numpy(Xtest).float().to(device), torch.from_numpy(Ytest).float().to(device)
 
     # Train model with min_lmbda
-    model.train()
     minibatch_size = model_dict['minibatch_size']
+    test_losses = np.zeros((n_epochs, Xtest.shape[0]))
 
     for epoch in range(n_epochs):
+        model.train()
         permutation = torch.randperm(X.shape[0])
         epoch_loss = 0
         for i in range(0, X.shape[0], minibatch_size):
@@ -176,6 +177,10 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, opt_lmbda, opt_lr, n_epochs
 
             batch_loss.backward()
             optimizer.step()
+
+        model.eval()
+        preds_test = model(Xtest)
+        test_losses[epoch] = criterion(preds_test.squeeze(), Ytest)
         
         # if epoch == n_epochs - 1:
             # print('[MLP Predictions] Epoch: {} | Train Loss: {}'.format(epoch, epoch_loss))
@@ -183,9 +188,9 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, opt_lmbda, opt_lr, n_epochs
     # Compute predictions
     model.eval()
     preds_test = model(Xtest)
-    return preds_test
+    return preds_test, test_losses
 
-def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_epochs=10):
+def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_epochs):
     num_lambdas = lambdas.shape[0]
 
     X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
@@ -236,8 +241,9 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_e
             cost[idx] = min_loss.item()
     return cost
 
-def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, n_epochs=10,
+def cross_val_ridge_mlp(train_features, train_data, test_features, test_data, n_epochs, n_splits=10,
                         lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
+    import utils.utils as general_utils
     input_size, hidden_size, output_size = train_features.shape[1], 16, 1 # feat_dim, 16, 1
     model_dict = dict(input_size=input_size, hidden_size=hidden_size, output_size=output_size, minibatch_size=train_data.shape[0]//n_splits)
 
@@ -245,6 +251,7 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, 
     num_lambdas = lambdas.shape[0]
 
     preds_all = torch.zeros((num_voxels, test_features.shape[0])) # (num_voxels, N_test) reshaped again before returning
+    test_losses_all = torch.zeros((num_voxels, n_epochs, test_features.shape[0])) # (num_voxels, n_epochs, N_test) reshaped again before returning
 
     ind = general_utils.CV_ind(train_data.shape[0], n_folds=n_splits)
     start_t = time.time()
@@ -259,15 +266,19 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, n_splits=10, 
             Xval, Yval = train_features[val], train_data[val][:, ivox]
             # print("Grad Descent Time: %f" % (time.time()-s_t))
             cost = ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval,
-                                                lambdas=lambdas, lrs=lrs) # cost: (num_lambdas, )
+                                                lambdas, lrs, n_epochs) # cost: (num_lambdas, )
             r_cv += cost
         argmin_lambda = np.argmin(r_cv)
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
         # print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
-        preds = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, opt_lambda, opt_lr) # preds: (N_test, 1)
+        preds, test_losses = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, 
+                                                        test_data, opt_lambda, opt_lr, n_epochs) # preds: (N_test, 1)
         preds_all[ivox] = preds.squeeze()
-        # end_t = time.time()
-        # print("Time Taken for vox: %fs" % (end_t - start_t))
-        # start_t = end_t
+        test_losses_all[ivox] = test_losses
+        if (ivox % 1000 == 0):
+            end_t = time.time()
+            print("{} vox: {}s".format(ivox, end_t - start_t))
+            start_t = end_t
     preds_all = preds_all.T # (N_test, num_voxels)
-    return preds_all
+    test_losses_all = np.transpose(test_losses_all, (2, 0, 1)) # (N_test, num_voxels, n_epochs)
+    return preds_all, test_losses_all
