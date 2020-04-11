@@ -272,7 +272,7 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, test_data, n_
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
         # print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
         preds, test_losses = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, 
-                                                        test_data, opt_lambda, opt_lr, n_epochs) # preds: (N_test, 1)
+                                                        test_data[:, ivox], opt_lambda, opt_lr, n_epochs) # preds: (N_test, 1)
         preds_all[ivox] = preds.squeeze()
         test_losses_all[ivox] = test_losses
         if (ivox % 1000 == 0):
@@ -280,5 +280,5 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, test_data, n_
             print("{} vox: {}s".format(ivox, end_t - start_t))
             start_t = end_t
     preds_all = preds_all.T # (N_test, num_voxels)
-    test_losses_all = np.transpose(test_losses_all, (2, 0, 1)) # (N_test, num_voxels, n_epochs)
+    test_losses_all = test_losses_all.permute(2, 0, 1) # (N_test, num_voxels, n_epochs)
     return preds_all, test_losses_all

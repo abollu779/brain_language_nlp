@@ -22,7 +22,8 @@ if __name__ == '__main__':
                          'nlp_feat_dir':args.nlp_feat_dir,
                          'layer':args.layer,
                          'seq_len':args.sequence_length,
-                         'encoding_model':args.encoding_model}
+                         'encoding_model':args.encoding_model,
+                         'subject':args.subject}
 
 
     # loading fMRI data
@@ -32,7 +33,7 @@ if __name__ == '__main__':
     rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
     data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
 
-    ind_num = 3
+    ind_num = 0
 
     corrs_t, _, _, preds_t, test_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
                                                                 predict_feat_dict)
