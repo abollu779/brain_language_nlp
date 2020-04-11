@@ -143,9 +143,9 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
     corrs = np.zeros((n_folds, n_voxels))
     acc = np.zeros((n_folds, n_voxels))
     acc_std = np.zeros((n_folds, n_voxels))
-    preds_d = np.zeros((data.shape[0], data.shape[1]))
+    preds_d = np.zeros((n_words, n_voxels))
     if encoding_model == 'mlp':
-        test_losses_d = np.zeros((data.shape[0], data.shape[1], n_epochs))
+        test_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
 
     all_test_data = []
     
@@ -197,12 +197,12 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
             # print("MLP Training: %fs" % (mlp_time))
             # # preds: (N_test, 27905)
             # preds = preds.detach().numpy()
-            preds = np.load('mlp_fold_preds/subject_{}/fold_{}.npy'.format(subject, ind_num)) # Change subject folder if needed!!!
-            test_losses = np.load('mlp_fold_losses/subject_{}/fold_{}.npy'.format(subject, ind_num)) # Change subject folder if needed!!!
+            preds = np.load('mlp_fold_preds/subject_{}/fold_{}.npy'.format(subject, ind_num))
+            test_losses = np.load('mlp_fold_losses/subject_{}/fold_{}.npy'.format(subject, ind_num))
         corrs[ind_num,:] = corr(preds,test_data)
         preds_d[test_ind] = preds
         if encoding_model == 'mlp':
-            test_losses_d[test_ind] = test_losses
+            test_losses_d[ind_num,:] = test_losses
         print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
 
     return corrs, acc, acc_std, preds_d, np.vstack(all_test_data), test_losses_d

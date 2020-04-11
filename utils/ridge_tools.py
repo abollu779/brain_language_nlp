@@ -159,7 +159,7 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, n
 
     # Train model with min_lmbda
     minibatch_size = model_dict['minibatch_size']
-    test_losses = np.zeros((n_epochs, Xtest.shape[0]))
+    test_losses = np.zeros((n_epochs,))
 
     for epoch in range(n_epochs):
         model.train()
@@ -251,7 +251,7 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, test_data, n_
     num_lambdas = lambdas.shape[0]
 
     preds_all = torch.zeros((num_voxels, test_features.shape[0])) # (num_voxels, N_test) reshaped again before returning
-    test_losses_all = torch.zeros((num_voxels, n_epochs, test_features.shape[0])) # (num_voxels, n_epochs, N_test) reshaped again before returning
+    test_losses_all = torch.zeros((num_voxels, n_epochs)) # (num_voxels, n_epochs) reshaped again before returning
 
     ind = general_utils.CV_ind(train_data.shape[0], n_folds=n_splits)
     start_t = time.time()
@@ -272,7 +272,7 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, test_data, n_
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
         # print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
         preds, test_losses = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, 
-                                                        test_data[:, ivox], opt_lambda, opt_lr, n_epochs) # preds: (N_test, 1)
+                                                        test_data[:, ivox], opt_lambda, opt_lr, n_epochs) # preds: (N_test, 1); test_losses: (n_epochs,)
         preds_all[ivox] = preds.squeeze()
         test_losses_all[ivox] = test_losses
         if (ivox % 1000 == 0):
@@ -280,5 +280,4 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, test_data, n_
             print("{} vox: {}s".format(ivox, end_t - start_t))
             start_t = end_t
     preds_all = preds_all.T # (N_test, num_voxels)
-    test_losses_all = test_losses_all.permute(2, 0, 1) # (N_test, num_voxels, n_epochs)
     return preds_all, test_losses_all
