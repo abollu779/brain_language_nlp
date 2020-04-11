@@ -251,7 +251,7 @@ def cross_val_ridge_mlp(train_features, train_data, test_features, test_data, n_
     num_lambdas = lambdas.shape[0]
 
     preds_all = torch.zeros((num_voxels, test_features.shape[0])) # (num_voxels, N_test) reshaped again before returning
-    test_losses_all = torch.zeros((num_voxels, n_epochs)) # (num_voxels, n_epochs) reshaped again before returning
+    test_losses_all = np.zeros((num_voxels, n_epochs)) # (num_voxels, n_epochs) reshaped again before returning
 
     ind = general_utils.CV_ind(train_data.shape[0], n_folds=n_splits)
     start_t = time.time()
