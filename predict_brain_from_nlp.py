@@ -35,7 +35,7 @@ if __name__ == '__main__':
     ind_num = 3
 
     corrs_t, _, _, preds_t, test_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
-                                                                predict_feat_dict, ind_num=ind_num)
+                                                                predict_feat_dict)
 
     fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model)
     print('saving: {}'.format(args.output_dir + fname))
