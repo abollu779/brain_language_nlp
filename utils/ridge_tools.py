@@ -149,7 +149,7 @@ def cross_val_ridge(train_features,train_data, n_splits = 10,
     return weights, np.array([lambdas[i] for i in argmin_lambda])
 
 def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, n_epochs):
-    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
+    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_1_size'], model_dict['hidden_2_size'], model_dict['output_size'])
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
     optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda) # adds ridge penalty to above SSE criterion
@@ -198,7 +198,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_e
 
     cost = np.zeros((num_lambdas, ))
     for idx,lmbda in enumerate(lambdas):
-        model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_size'], model_dict['output_size'])
+        model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_1_size'], model_dict['hidden_2_size'], model_dict['output_size'])
         model = model.to(device)
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
         optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
@@ -241,11 +241,21 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_e
             cost[idx] = min_loss.item()
     return cost
 
-def cross_val_ridge_mlp(train_features, train_data, test_features, test_data, n_epochs, n_splits=10,
+def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_epochs, n_splits=10,
                         lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
     import utils.utils as general_utils
-    input_size, hidden_size, output_size = train_features.shape[1], 16, 1 # feat_dim, 16, 1
-    model_dict = dict(input_size=input_size, hidden_size=hidden_size, output_size=output_size, minibatch_size=train_data.shape[0]//n_splits)
+
+    if encoding_model == 'mlp_initial':
+        input_size, hidden_1_size, hidden_2_size, output_size = train_features.shape[1], 16, None, 1 # feat_dim, 16, 1
+    elif encoding_model == 'mlp_smallerhiddensize':
+        input_size, hidden_1_size, hidden_2_size, output_size = train_features.shape[1], 8, None, 1 # feat_dim, 8, 1
+    elif encoding_model == 'mlp_largerhiddensize':
+        input_size, hidden_1_size, hidden_2_size, output_size = train_features.shape[1], 24, None, 1 # feat_dim, 24, 1
+    else:
+        assert encoding_model == 'mlp_additionalhiddenlayer'
+        input_size, hidden_1_size, hidden_2_size, output_size = train_features.shape[1], 16, 4, 1 # feat_dim, 16, 4, 1
+    model_dict = dict(input_size=input_size, hidden_1_size=hidden_1_size, hidden_2_size=hidden_2_size, output_size=output_size, minibatch_size=train_data.shape[0]//n_splits)
+
 
     num_voxels = train_data.shape[1]
     num_lambdas = lambdas.shape[0]

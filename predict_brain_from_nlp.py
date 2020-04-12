@@ -3,7 +3,7 @@ import numpy as np
 
 from utils.utils import run_class_time_CV_fmri_crossval_ridge
 
-encoding_model_options = ['linear', 'mlp']
+encoding_model_options = ['linear', 'mlp_initial', 'mlp_smallerhiddensize', 'mlp_largerhiddensize', 'mlp_additionalhiddenlayer']
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
