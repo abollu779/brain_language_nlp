@@ -201,7 +201,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
             test_losses = np.load('{}/mlp_fold_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num))
         corrs[ind_num,:] = corr(preds,test_data)
         preds_d[test_ind] = preds
-        if encoding_model == 'mlp':
+        if 'mlp' in encoding_model:
             test_losses_d[ind_num,:] = test_losses
         print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
 
