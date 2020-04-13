@@ -4,6 +4,7 @@ encoder_preds/
 nlp_features/
 final_accs/
 mlp_fold_preds/
-mlp_fold_losses/
+mlp_fold_train_losses/
+mlp_fold_test_losses/
 plots/
 utils/__pycache__/*

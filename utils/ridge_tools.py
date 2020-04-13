@@ -159,6 +159,7 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, n
 
     # Train model with min_lmbda
     minibatch_size = model_dict['minibatch_size']
+    train_losses = np.zeros((n_epochs,))
     test_losses = np.zeros((n_epochs,))
 
     for epoch in range(n_epochs):
@@ -178,6 +179,7 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, n
             batch_loss.backward()
             optimizer.step()
 
+        train_losses[epoch] = epoch_loss
         model.eval()
         preds_test = model(Xtest)
         test_losses[epoch] = criterion(preds_test.squeeze(), Ytest)
@@ -188,7 +190,7 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, n
     # Compute predictions
     model.eval()
     preds_test = model(Xtest)
-    return preds_test, test_losses
+    return preds_test, train_losses, test_losses
 
 def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_epochs):
     num_lambdas = lambdas.shape[0]
@@ -261,6 +263,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     num_lambdas = lambdas.shape[0]
 
     preds_all = torch.zeros((num_voxels, test_features.shape[0])) # (num_voxels, N_test) reshaped again before returning
+    train_losses_all = np.zeros((num_voxels, n_epochs)) # (num_voxels, n_epochs) reshaped again before returning
     test_losses_all = np.zeros((num_voxels, n_epochs)) # (num_voxels, n_epochs) reshaped again before returning
 
     ind = general_utils.CV_ind(train_data.shape[0], n_folds=n_splits)
@@ -281,13 +284,14 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         argmin_lambda = np.argmin(r_cv)
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
         # print("=================== Vox: {}, OptLambda: {} ====================".format(ivox, opt_lambda))
-        preds, test_losses = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, 
+        preds, train_losses, test_losses = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, 
                                                         test_data[:, ivox], opt_lambda, opt_lr, n_epochs) # preds: (N_test, 1); test_losses: (n_epochs,)
         preds_all[ivox] = preds.squeeze()
+        train_losses_all[ivox] = train_losses
         test_losses_all[ivox] = test_losses
         if (ivox % 1000 == 0):
             end_t = time.time()
             print("{} vox: {}s".format(ivox, end_t - start_t))
             start_t = end_t
     preds_all = preds_all.T # (N_test, num_voxels)
-    return preds_all, test_losses_all
+    return preds_all, train_losses_all, test_losses_all

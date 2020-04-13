@@ -28,7 +28,7 @@ mlp_smallerhiddensize_losses = collect_mlp_losses('mlp_smallerhiddensize', args.
 mlp_largerhiddensize_losses = collect_mlp_losses('mlp_largerhiddensize', args.subject, args.voxel_num)
 mlp_additionalhiddenlayer_losses = collect_mlp_losses('mlp_additionalhiddenlayer', args.subject, args.voxel_num)
 
-fig, axs = plt.subplots(2, 2)
+fig, axs = plt.subplots(2, 2, figsize=(14,8))
 for fold in range(num_folds):
     axs_x, axs_y = fold // 2, fold % 2
     axs[axs_x, axs_y].plot(X, mlp_initial_losses[fold], color='green')
@@ -48,7 +48,6 @@ blue_patch = mpatches.Patch(color='blue', label='mlp_smallerhiddensize')
 red_patch = mpatches.Patch(color='red', label='mlp_largerhiddensize')
 black_patch = mpatches.Patch(color='black', label='mlp_additionalhiddenlayer')
 plt.legend(handles=[green_patch, blue_patch, red_patch, black_patch])
-
 plt.show()
 
 

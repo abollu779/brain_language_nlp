@@ -145,6 +145,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
     acc_std = np.zeros((n_folds, n_voxels))
     preds_d = np.zeros((n_words, n_voxels))
     if 'mlp' in encoding_model:
+        train_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
         test_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
 
     all_test_data = []
@@ -192,20 +193,22 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
         else:
             assert 'mlp' in encoding_model
             # s_t = tm.time()
-            # preds, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_epochs, n_splits=10, lambdas = np.array([10**i for i in (3,4)]), lrs = np.array([1e-4,1e-4]))
+            # preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_epochs, n_splits=10, lambdas = np.array([10**i for i in (3,4)]), lrs = np.array([1e-4,1e-4]))
             # mlp_time = tm.time() - s_t
             # print("MLP Training: %fs" % (mlp_time))
             # # preds: (N_test, 27905)
             # preds = preds.detach().numpy()
             preds = np.load('{}/mlp_fold_preds/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num))
-            test_losses = np.load('{}/mlp_fold_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num))
+            train_losses = np.load('{}/mlp_fold_train_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num))
+            test_losses = np.load('{}/mlp_fold_test_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num))
         corrs[ind_num,:] = corr(preds,test_data)
         preds_d[test_ind] = preds
         if 'mlp' in encoding_model:
+            train_losses_d[ind_num,:] = train_losses
             test_losses_d[ind_num,:] = test_losses
         print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
 
-    return corrs, acc, acc_std, preds_d, np.vstack(all_test_data), test_losses_d
+    return corrs, acc, acc_std, preds_d, np.vstack(all_test_data), train_losses_d, test_losses_d
 
 def binary_classify_neighborhoods(Ypred, Y, n_class=20, nSample = 1000,pair_samples = [],neighborhoods=[]):
     # n_class = how many words to classify at once
