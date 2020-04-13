@@ -26,7 +26,7 @@ if __name__ == '__main__':
 # mlp_accs_avg = mlp_accs_avg[np.where(rois.item()[args.subject]['all'] == 1)[0]]
 
 linear_output = np.load('encoder_preds/predict_{}_with_bert_layer_1_len_1_encoder_linear.npy'.format(args.subject), allow_pickle=True)
-mlp_output = np.load('encoder_preds/predict_{}_with_bert_layer_1_len_1_encoder_mlp.npy'.format(args.subject), allow_pickle=True)
+mlp_output = np.load('encoder_preds/predict_{}_with_bert_layer_1_len_1_encoder_mlp_initial.npy'.format(args.subject), allow_pickle=True)
 
 linear_corrs = linear_output.item()['corrs_t']
 mlp_corrs = mlp_output.item()['corrs_t']
@@ -123,4 +123,4 @@ def plot_accuracies(X, Y, subject, voxels_type):
     plt.ylim(0, 1)
     plt.savefig('plots/accs_{}_subject_{}.png'.format(voxels_type, subject))
 
-plot_accuracies(X, Y, args.subject, args.voxels_type)
+plot_correlations(X, Y, args.subject, args.voxels_type)
