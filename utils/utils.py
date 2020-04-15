@@ -144,6 +144,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
     acc = np.zeros((n_folds, n_voxels))
     acc_std = np.zeros((n_folds, n_voxels))
     preds_d = np.zeros((n_words, n_voxels))
+    train_losses_d, test_losses_d = None, None
     if 'mlp' in encoding_model:
         train_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
         test_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
