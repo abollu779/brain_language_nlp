@@ -211,6 +211,22 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
 
     return corrs, acc, acc_std, preds_d, np.vstack(all_test_data), train_losses_d, test_losses_d
 
+def binary_class(Ypred, Y, n_class=20, nSample = 1000):
+    # does 1000 samples of 1vs2 classification
+    n = Y.shape[0]
+    acc = np.zeros((Y.shape[1]))
+    for iS in range(nSample):
+        idx_real = np.random.choice(n, n_class)
+        sample_real = Y[idx_real]
+        sample_pred_correct = Ypred[idx_real]
+        idx_wrong = np.random.choice(n, n_class)
+        sample_pred_incorrect = Ypred[idx_wrong]
+        dist_correct = np.sum((sample_real - sample_pred_correct)**2,0)
+        dist_incorrect = np.sum((sample_real - sample_pred_incorrect)**2,0)
+        acc += (dist_correct <= dist_incorrect)*1.0
+    acc = acc/nSample
+    return acc
+
 def binary_classify_neighborhoods(Ypred, Y, n_class=20, nSample = 1000,pair_samples = [],neighborhoods=[]):
     # n_class = how many words to classify at once
     # nSample = how many words to classify
