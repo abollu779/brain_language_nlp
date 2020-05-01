@@ -33,9 +33,8 @@ if __name__ == '__main__':
 
     for ind_num in range(n_folds):
         test_ind = ind==ind_num
-        accs[ind_num,:],_,_,_ = binary_classify_neighborhoods(preds_t_per_feat[test_ind,:], test_t_per_feat[test_ind,:], n_class=20, nSample = 1000,pair_samples = [],neighborhoods=neighborhoods)
-        # accs[ind_num,:] = binary_class(preds_t_per_feat[test_ind,:], test_t_per_feat[test_ind,:], n_class=20, nSample = 1000)
-
+        # accs[ind_num,:],_,_,_ = binary_classify_neighborhoods(preds_t_per_feat[test_ind,:], test_t_per_feat[test_ind,:], n_class=20, nSample = 1000,pair_samples = [],neighborhoods=neighborhoods)
+        accs[ind_num,:] = binary_class(preds_t_per_feat[test_ind,:], test_t_per_feat[test_ind,:], n_class=20, nSample = 1000)
 
     fname = args.output_path
     if n_class < 20:
