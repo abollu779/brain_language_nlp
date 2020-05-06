@@ -209,7 +209,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
     n_words = data.shape[0]
     n_voxels = data.shape[1]
 
-    ind = CV_ind(n_words, n_folds=n_folds)
+    ind = CV_ind(n_words, n_splits=n_folds)
 
     corrs_d = np.zeros((n_folds, n_voxels))
     acc = np.zeros((n_folds, n_voxels))

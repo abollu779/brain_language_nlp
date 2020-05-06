@@ -257,7 +257,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     train_losses_all = np.zeros((num_voxels, n_epochs))
     test_losses_all = np.zeros((num_voxels, n_epochs))
 
-    ind = general_utils.CV_ind(train_data.shape[0], n_folds=n_splits)
+    ind = general_utils.CV_ind(train_data.shape[0], n_splits=n_splits)
     start_t = time.time()
 
     for ivox in range(num_voxels):
