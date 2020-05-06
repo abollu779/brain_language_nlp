@@ -10,6 +10,7 @@ import pdb
 from sklearn.metrics.pairwise import euclidean_distances
 from scipy.ndimage.filters import gaussian_filter
 
+from utils.global_params import n_folds, n_epochs
 from utils.ridge_tools import cross_val_ridge, corr, cross_val_ridge_mlp
 import time as tm
 
@@ -67,12 +68,12 @@ def get_nlp_features_fixed_length(layer, seq_len, feat_type, feat_dir, train_ind
 
     return train, test, train_pca, test_pca 
 
-def CV_ind(n, n_folds):
+def CV_ind(n, n_splits):
     ind = np.zeros((n))
-    n_items = int(np.floor(n/n_folds))
-    for i in range(0,n_folds -1):
+    n_items = int(np.floor(n/n_splits))
+    for i in range(0,n_splits -1):
         ind[i*n_items:(i+1)*n_items] = i
-    ind[(n_folds-1)*n_items:] = (n_folds-1)
+    ind[(n_splits-1)*n_items:] = (n_splits-1)
     return ind
 
 def TR_to_word_CV_ind(TR_train_indicator,SKIP_WORDS=20,END_WORDS=5176):
@@ -122,7 +123,7 @@ def prepare_fmri_features(train_features, test_features, word_train_indicator, T
         
     return tmp[TR_train_indicator], tmp[~TR_train_indicator]
 
-def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_ind, data, predict_feat_dict, n_epochs, n_folds,
+def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_ind, data, predict_feat_dict,
                                                         regress_feat_names_list = [],
                                                         method = 'kernel_ridge', 
                                                         lambdas = np.array([0.1,1,10,100,1000]),
@@ -170,9 +171,12 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         del weights
     else:
         assert 'mlp' in encoding_model
-        preds_path = '{}/mlp_fold_preds/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num)
-        train_losses_path = '{}/mlp_fold_train_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num)
-        test_losses_path = '{}/mlp_fold_test_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num)
+        preds_dir = '{}/mlp_fold_preds/subject_{}/'.format(encoding_model, subject)
+        preds_path = preds_dir + 'fold_{}.npy'.format(ind_num)
+        train_losses_dir = '{}/mlp_fold_train_losses/subject_{}/'.format(encoding_model, subject)
+        train_losses_path = train_losses_dir + 'fold_{}.npy'.format(ind_num)
+        test_losses_dir = '{}/mlp_fold_test_losses/subject_{}/'.format(encoding_model, subject)
+        test_losses_path = test_losses_dir + 'fold_{}.npy'.format(ind_num)
 
         s_t = tm.time()
         if (os.path.exists(preds_path) and os.path.exists(train_losses_path) and os.path.exists(test_losses_path)):
@@ -180,9 +184,13 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
             train_losses = np.load(train_losses_path)
             test_losses = np.load(test_losses_path)
         else:
-            preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_epochs, n_splits=10, lambdas=np.array([10**i for i in (3,4)]), lrs=np.array([1e-4,1e-4]))
+            preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_splits=10, lambdas=np.array([10**i for i in (3,4)]), lrs=np.array([1e-4,1e-4]))
             preds = preds.detach().cpu().numpy()
 
+            os.makedirs(preds_dir, exist_ok=True)
+            os.makedirs(train_losses_dir, exist_ok=True)
+            os.makedirs(test_losses_dir, exist_ok=True)
+            
             np.save(preds_path, preds)
             np.save(train_losses_path, train_losses)
             np.save(test_losses_path, test_losses)
@@ -193,7 +201,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
     print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
     return corrs, preds, train_losses, test_losses, test_data
 
-def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict, n_folds=4, n_epochs=10):
+def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
     encoding_model = predict_feat_dict['encoding_model']
     single_fold_computation = predict_feat_dict['single_fold_computation']
     fold_num = predict_feat_dict['fold_num']
@@ -219,7 +227,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict, n_folds=4, n_
         train_ind = ind!=fold_num
         test_ind = ind==fold_num
         corrs, preds, train_losses, test_losses, test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
-                                                                                                        data, predict_feat_dict, n_epochs, n_folds)
+                                                                                                        data, predict_feat_dict)
         pdb.set_trace()
     else: 
         # Train across all folds
@@ -227,7 +235,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict, n_folds=4, n_
             train_ind = ind!=ind_num
             test_ind = ind==ind_num
             corrs, preds, train_losses, test_losses, test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_ind, 
-                                                                                                        data, predict_feat_dict, n_epochs, n_folds)
+                                                                                                        data, predict_feat_dict)
             all_test_data.append(test_data)
             corrs_d[ind_num,:] = corrs
             preds_d[test_ind] = preds

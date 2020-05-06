@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from scipy.stats import zscore
 
+from utils.global_params import n_epochs
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -144,7 +145,7 @@ def cross_val_ridge(train_features,train_data, n_splits = 10,
 
     return weights, np.array([lambdas[i] for i in argmin_lambda])
 
-def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, n_epochs):
+def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr):
     model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_1_size'], model_dict['hidden_2_size'], model_dict['output_size'])
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum')
@@ -185,7 +186,7 @@ def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, n
     preds_test = model(Xtest)
     return preds_test, train_losses, test_losses
 
-def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_epochs):
+def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
     num_lambdas = lambdas.shape[0]
 
     X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
@@ -232,7 +233,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, n_e
             cost[idx] = min_loss.item()
     return cost
 
-def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_epochs, n_splits=10,
+def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_splits=10,
                         lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
     import utils.utils as general_utils
 
@@ -267,14 +268,14 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
             trn = ind!=ind_num
             val = ind==ind_num
             cost = ridge_by_lambda_grad_descent(model_dict, train_features[trn], train_data[trn][:, ivox], 
-                                                train_features[val], train_data[val][:, ivox], lambdas, lrs, n_epochs) # cost: (num_lambdas, )
+                                                train_features[val], train_data[val][:, ivox], lambdas, lrs) # cost: (num_lambdas, )
             r_cv += cost
         
         # Identify optimal lambda and use it to generate predictions
         argmin_lambda = np.argmin(r_cv)
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
         preds, train_losses, test_losses = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, 
-                                                        test_data[:, ivox], opt_lambda, opt_lr, n_epochs) # preds: (N_test, 1); test_losses: (n_epochs,)
+                                                        test_data[:, ivox], opt_lambda, opt_lr) # preds: (N_test, 1); test_losses: (n_epochs,)
         
         # Store predictions and model losses
         preds_all[ivox] = preds.squeeze()

@@ -1,10 +1,9 @@
 import argparse
 import numpy as np
+import os
 
+from utils.global_params import n_folds, encoding_model_options
 from utils.utils import run_class_time_CV_fmri_crossval_ridge
-
-n_folds = 4
-encoding_model_options = ['linear', 'mlp_initial', 'mlp_smallerhiddensize', 'mlp_largerhiddensize', 'mlp_additionalhiddenlayer']
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -46,6 +45,8 @@ if __name__ == '__main__':
     dirname = 'allvoxels/' if args.use_all_voxels else 'roivoxels/'
     fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model)
     print('saving: {}'.format(args.output_dir + dirname + fname))
+
+    os.makedirs(args.output_dir + dirname, exist_ok=True)
 
     np.save(args.output_dir + dirname + fname + '.npy', {'corrs_t':corrs_t,'preds_t':preds_t,'test_t':test_t,'train_losses_t':train_losses_t,'test_losses_t':test_losses_t})
 
