@@ -3,17 +3,21 @@ import numpy as np
 
 from utils.utils import run_class_time_CV_fmri_crossval_ridge
 
+n_folds = 4
 encoding_model_options = ['linear', 'mlp_initial', 'mlp_smallerhiddensize', 'mlp_largerhiddensize', 'mlp_additionalhiddenlayer']
-    
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", required=True)
-    parser.add_argument("--nlp_feat_type", required=True)
-    parser.add_argument("--nlp_feat_dir", required=True)
+    parser.add_argument("--nlp-feat-type", required=True)
+    parser.add_argument("--nlp-feat-dir", required=True)
     parser.add_argument("--layer", type=int, required=False)
-    parser.add_argument("--sequence_length", type=int, required=False)
-    parser.add_argument("--encoding_model", default="linear", choices=encoding_model_options)
-    parser.add_argument("--output_dir", required=True)
+    parser.add_argument("--sequence-length", type=int, required=False)
+    parser.add_argument("--encoding-model", default='linear', choices=encoding_model_options)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--use-all-voxels", action='store_true')
+    parser.add_argument("--single-fold-computation", action='store_true')
+    parser.add_argument("--fold-num", type=int, choices=[i for i in range(n_folds)])
     
     args = parser.parse_args()
     print(args)
@@ -23,24 +27,26 @@ if __name__ == '__main__':
                          'layer':args.layer,
                          'seq_len':args.sequence_length,
                          'encoding_model':args.encoding_model,
-                         'subject':args.subject}
+                         'subject':args.subject,
+                         'single_fold_computation': args.single_fold_computation,
+                         'fold_num': args.fold_num}
 
 
     # loading fMRI data
     data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
 
     # limit to ROI data
-    rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
-    data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
+    if not args.use_all_voxels:
+        rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
+        data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
 
-    ind_num = 0
-
-    corrs_t, _, _, preds_t, test_t, train_losses_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
+    corrs_t, preds_t, test_t, train_losses_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
                                                                 predict_feat_dict)
 
+    dirname = 'allvoxels/' if args.use_all_voxels else 'roivoxels/'
     fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model)
-    print('saving: {}'.format(args.output_dir + fname))
+    print('saving: {}'.format(args.output_dir + dirname + fname))
 
-    np.save(args.output_dir + fname + '.npy', {'corrs_t':corrs_t,'preds_t':preds_t,'test_t':test_t,'train_losses_t':train_losses_t,'test_losses_t':test_losses_t})
+    np.save(args.output_dir + dirname + fname + '.npy', {'corrs_t':corrs_t,'preds_t':preds_t,'test_t':test_t,'train_losses_t':train_losses_t,'test_losses_t':test_losses_t})
 
     

@@ -8,9 +8,10 @@ from utils.utils import binary_classify_neighborhoods, CV_ind, binary_class
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_path", required=True)
-    parser.add_argument("--output_path", required=True)
+    parser.add_argument("--input-path", required=True)
+    parser.add_argument("--output-dir", required=True)
     parser.add_argument("--subject", default='')
+    parser.add_argument("--use-neighborhoods", action='store_true')
     args = parser.parse_args()
     print(args)
 
@@ -33,17 +34,21 @@ if __name__ == '__main__':
 
     for ind_num in range(n_folds):
         test_ind = ind==ind_num
-        # accs[ind_num,:],_,_,_ = binary_classify_neighborhoods(preds_t_per_feat[test_ind,:], test_t_per_feat[test_ind,:], n_class=20, nSample = 1000,pair_samples = [],neighborhoods=neighborhoods)
-        accs[ind_num,:] = binary_class(preds_t_per_feat[test_ind,:], test_t_per_feat[test_ind,:], n_class=20, nSample = 1000)
+        if args.use_neighborhoods:
+            accs[ind_num,:],_,_,_ = binary_classify_neighborhoods(preds_t_per_feat[test_ind,:], test_t_per_feat[test_ind,:], n_class=20, nSample = 1000,pair_samples = [],neighborhoods=neighborhoods)
+        else:
+            accs[ind_num,:] = binary_class(preds_t_per_feat[test_ind,:], test_t_per_feat[test_ind,:], n_class=20, nSample = 1000)
 
-    fname = args.output_path
+    output_dirname = args.output_dir + args.input_path.split('encoder_preds/')[1].split('predict_')[0]
+    output_fname = args.input_path.split('predict_')[1].split('.npy')[0]
+    output_path = output_dirname + output_fname
     if n_class < 20:
         fname = fname + '_{}v{}_'.format(n_class,n_class)
 
-    with open(fname + '_accs_ROI.pkl','wb') as fout:
+    with open(fname + '_accs.pkl','wb') as fout:
         pk.dump(accs,fout)
 
-    print('saved: {}'.format(fname + '_accs_ROI.pkl'))
+    print('saved: {}'.format(fname + '_accs.pkl'))
 
 
     

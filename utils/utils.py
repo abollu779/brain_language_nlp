@@ -4,7 +4,9 @@ from scipy.stats import zscore
 import time
 import csv
 import os
+import os.path
 import nibabel
+import pdb
 from sklearn.metrics.pairwise import euclidean_distances
 from scipy.ndimage.filters import gaussian_filter
 
@@ -120,29 +122,89 @@ def prepare_fmri_features(train_features, test_features, word_train_indicator, T
         
     return tmp[TR_train_indicator], tmp[~TR_train_indicator]
 
-  
-
-def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
-                                          regress_feat_names_list = [],method = 'kernel_ridge', 
-                                          lambdas = np.array([0.1,1,10,100,1000]),
-                                          detrend = False, n_folds = 4, skip=5, n_epochs=10):
-    
-    nlp_feat_type = predict_feat_dict['nlp_feat_type']
-    feat_dir = predict_feat_dict['nlp_feat_dir']
+def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_ind, data, predict_feat_dict, n_epochs, n_folds,
+                                                        regress_feat_names_list = [],
+                                                        method = 'kernel_ridge', 
+                                                        lambdas = np.array([0.1,1,10,100,1000]),
+                                                        detrend = False, skip=5):
     layer = predict_feat_dict['layer']
     seq_len = predict_feat_dict['seq_len']
+    nlp_feat_type = predict_feat_dict['nlp_feat_type']
+    feat_dir = predict_feat_dict['nlp_feat_dir']
     encoding_model = predict_feat_dict['encoding_model']
     subject = predict_feat_dict['subject']
-        
-        
+
+    word_CV_ind = TR_to_word_CV_ind(train_ind)
+    train_losses, test_losses = None, None
+
+    _,_,tmp_train_features,tmp_test_features = get_nlp_features_fixed_length(layer, seq_len, nlp_feat_type, feat_dir, word_CV_ind)
+    train_features,test_features = prepare_fmri_features(tmp_train_features, tmp_test_features, word_CV_ind, train_ind)
+
+    # split data
+    train_data = data[train_ind]
+    test_data = data[test_ind]
+
+    # skip TRs between train and test data
+    if ind_num == 0: # just remove from front end
+        train_data = train_data[skip:,:]
+        train_features = train_features[skip:,:]
+    elif ind_num == n_folds-1: # just remove from back end
+        train_data = train_data[:-skip,:]
+        train_features = train_features[:-skip,:]
+    else:
+        train_data = train_data[skip:-skip,:]
+        train_features = train_features[skip:-skip,:]
+
+    # normalize data
+    train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
+    test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
+    
+    train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
+    test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
+
+    start_time = tm.time()
+    if encoding_model == 'linear':
+        weights, chosen_lambdas = cross_val_ridge(train_features, train_data, n_splits=10, lambdas=np.array([10**i for i in (3,4)]), method='plain', do_plot=False)
+        preds =  np.dot(test_features, weights)
+        # weights: (40, 27905)
+        del weights
+    else:
+        assert 'mlp' in encoding_model
+        preds_path = '{}/mlp_fold_preds/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num)
+        train_losses_path = '{}/mlp_fold_train_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num)
+        test_losses_path = '{}/mlp_fold_test_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num)
+
+        s_t = tm.time()
+        if (os.path.exists(preds_path) and os.path.exists(train_losses_path) and os.path.exists(test_losses_path)):
+            preds = np.load(preds_path)
+            train_losses = np.load(train_losses_path)
+            test_losses = np.load(test_losses_path)
+        else:
+            preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_epochs, n_splits=10, lambdas=np.array([10**i for i in (3,4)]), lrs=np.array([1e-4,1e-4]))
+            preds = preds.detach().cpu().numpy()
+
+            np.save(preds_path, preds)
+            np.save(train_losses_path, train_losses)
+            np.save(test_losses_path, test_losses)
+        # preds: (N_test, 27905)
+        mlp_time = tm.time() - s_t
+        print("-> MLP Training Time for One Fold: %fs" % (mlp_time))
+    corrs = corr(preds, test_data)
+    print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
+    return corrs, preds, train_losses, test_losses, test_data
+
+def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict, n_folds=4, n_epochs=10):
+    encoding_model = predict_feat_dict['encoding_model']
+    single_fold_computation = predict_feat_dict['single_fold_computation']
+    fold_num = predict_feat_dict['fold_num']
+
     n_words = data.shape[0]
     n_voxels = data.shape[1]
 
     ind = CV_ind(n_words, n_folds=n_folds)
 
-    corrs = np.zeros((n_folds, n_voxels))
+    corrs_d = np.zeros((n_folds, n_voxels))
     acc = np.zeros((n_folds, n_voxels))
-    acc_std = np.zeros((n_folds, n_voxels))
     preds_d = np.zeros((n_words, n_voxels))
     train_losses_d, test_losses_d = None, None
     if 'mlp' in encoding_model:
@@ -151,65 +213,30 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
 
     all_test_data = []
     
-    
-    for ind_num in range(n_folds):
-        train_ind = ind!=ind_num
-        test_ind = ind==ind_num
-        
-        word_CV_ind = TR_to_word_CV_ind(train_ind)
-        
-        _,_,tmp_train_features,tmp_test_features = get_nlp_features_fixed_length(layer, seq_len, nlp_feat_type, feat_dir, word_CV_ind)
-        train_features,test_features = prepare_fmri_features(tmp_train_features, tmp_test_features, word_CV_ind, train_ind)
-        
-        # split data
-        train_data = data[train_ind]
-        test_data = data[test_ind]
+    if single_fold_computation:
+        assert 'mlp' in encoding_model
 
-        # skip TRs between train and test data
-        if ind_num == 0: # just remove from front end
-            train_data = train_data[skip:,:]
-            train_features = train_features[skip:,:]
-        elif ind_num == n_folds-1: # just remove from back end
-            train_data = train_data[:-skip,:]
-            train_features = train_features[:-skip,:]
-        else:
-            train_data = train_data[skip:-skip,:]
-            train_features = train_features[skip:-skip,:]
+        train_ind = ind!=fold_num
+        test_ind = ind==fold_num
+        corrs, preds, train_losses, test_losses, test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
+                                                                                                        data, predict_feat_dict, n_epochs, n_folds)
+        pdb.set_trace()
+    else: 
+        # Train across all folds
+        for ind_num in range(n_folds):
+            train_ind = ind!=ind_num
+            test_ind = ind==ind_num
+            corrs, preds, train_losses, test_losses, test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_ind, 
+                                                                                                        data, predict_feat_dict, n_epochs, n_folds)
+            all_test_data.append(test_data)
+            corrs_d[ind_num,:] = corrs
+            preds_d[test_ind] = preds
 
-        # normalize data
-        train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
-        test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
-        all_test_data.append(test_data)
-        
-        train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
-        test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
+            if 'mlp' in encoding_model:
+                train_losses_d[ind_num,:] = train_losses
+                test_losses_d[ind_num,:] = test_losses
 
-        start_time = tm.time()
-        if encoding_model == 'linear':
-            weights, chosen_lambdas = cross_val_ridge(train_features,train_data, n_splits = 10, lambdas = np.array([10**i for i in (3,4)]), method = 'plain',do_plot = False)
-            # weights: (40, 27905)
-            preds =  np.dot(test_features, weights)
-            # preds: (N_test, 27905)
-            del weights
-        else:
-            assert 'mlp' in encoding_model
-            # s_t = tm.time()
-            # preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_epochs, n_splits=10, lambdas = np.array([10**i for i in (3,4)]), lrs = np.array([1e-4,1e-4]))
-            # mlp_time = tm.time() - s_t
-            # print("MLP Training: %fs" % (mlp_time))
-            # # preds: (N_test, 27905)
-            # preds = preds.detach().numpy()
-            preds = np.load('{}/mlp_fold_preds/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num))
-            train_losses = np.load('{}/mlp_fold_train_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num))
-            test_losses = np.load('{}/mlp_fold_test_losses/subject_{}/fold_{}.npy'.format(encoding_model, subject, ind_num))
-        corrs[ind_num,:] = corr(preds,test_data)
-        preds_d[test_ind] = preds
-        if 'mlp' in encoding_model:
-            train_losses_d[ind_num,:] = train_losses
-            test_losses_d[ind_num,:] = test_losses
-        print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
-
-    return corrs, acc, acc_std, preds_d, np.vstack(all_test_data), train_losses_d, test_losses_d
+    return corrs_d, preds_d, np.vstack(all_test_data), train_losses_d, test_losses_d
 
 def binary_class(Ypred, Y, n_class=20, nSample = 1000):
     # does 1000 samples of 1vs2 classification
@@ -223,7 +250,7 @@ def binary_class(Ypred, Y, n_class=20, nSample = 1000):
         sample_pred_incorrect = Ypred[idx_wrong]
         dist_correct = np.sum((sample_real - sample_pred_correct)**2,0)
         dist_incorrect = np.sum((sample_real - sample_pred_incorrect)**2,0)
-        acc += (dist_correct <= dist_incorrect)*1.0
+        acc += (dist_correct < dist_incorrect)*1.0 + (dist_correct == dist_incorrect)*0.5
     acc = acc/nSample
     return acc
 
