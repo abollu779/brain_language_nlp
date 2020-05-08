@@ -47,12 +47,12 @@ if __name__ == '__main__':
     os.makedirs(output_dirname, exist_ok=True)
 
     if n_class < 20:
-        fname = fname + '_{}v{}_'.format(n_class,n_class)
+        output_path = output_path + '_{}v{}_'.format(n_class,n_class)
 
-    with open(fname + '_accs.pkl','wb') as fout:
+    with open(output_path + '_accs.pkl','wb') as fout:
         pk.dump(accs,fout)
 
-    print('saved: {}'.format(fname + '_accs.pkl'))
+    print('saved: {}'.format(output_path + '_accs.pkl'))
 
 
     
