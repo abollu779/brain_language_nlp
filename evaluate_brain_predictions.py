@@ -39,7 +39,8 @@ if __name__ == '__main__':
         else:
             accs[ind_num,:] = binary_class(preds_t_per_feat[test_ind,:], test_t_per_feat[test_ind,:], n_class=20, nSample = 1000)
 
-    output_dirname = args.output_dir + args.input_path.split('encoder_preds/')[1].split('predict_')[0]
+    neighborhood_subdirname = 'neighborhood/' if args.use_neighborhoods else 'noneighborhood/'
+    output_dirname = args.output_dir + args.input_path.split('encoder_preds/')[1].split('predict_')[0] + neighborhood_subdirname
     output_fname = args.input_path.split('predict_')[1].split('.npy')[0]
     output_path = output_dirname + output_fname
 
