@@ -179,6 +179,9 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
         train_losses[epoch] = epoch_loss
         model.eval()
         preds_test = model(Xtest)
+        if epoch == 0:
+            preds_path = 'preds_epoch0.npy'
+            np.save(preds_path, preds_test)
         test_losses[epoch] = criterion(preds_test.squeeze(), Ytest)
 
     # Generate predictions
