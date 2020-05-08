@@ -19,6 +19,10 @@ if __name__ == '__main__':
     parser.add_argument("--fold-num", type=int, choices=[i for i in range(n_folds)])
     
     args = parser.parse_args()
+
+    if args.single_fold_computation and (args.fold_num is None):
+        parser.error("--single-fold-computation requires --fold-num to specify which fold to use.")
+
     print(args)
         
     predict_feat_dict = {'nlp_feat_type':args.nlp_feat_type,
@@ -28,7 +32,8 @@ if __name__ == '__main__':
                          'encoding_model':args.encoding_model,
                          'subject':args.subject,
                          'single_fold_computation': args.single_fold_computation,
-                         'fold_num': args.fold_num}
+                         'fold_num': args.fold_num,
+                         'use_all_voxels': args.use_all_voxels}
 
 
     # loading fMRI data
@@ -42,12 +47,13 @@ if __name__ == '__main__':
     corrs_t, preds_t, test_t, train_losses_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
                                                                 predict_feat_dict)
 
-    dirname = 'allvoxels/' if args.use_all_voxels else 'roivoxels/'
-    fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model)
-    print('saving: {}'.format(args.output_dir + dirname + fname))
+    if not args.single_fold_computation:
+        dirname = 'allvoxels/' if args.use_all_voxels else 'roivoxels/'
+        fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model)
+        print('saving: {}'.format(args.output_dir + dirname + fname))
 
-    os.makedirs(args.output_dir + dirname, exist_ok=True)
+        os.makedirs(args.output_dir + dirname, exist_ok=True)
 
-    np.save(args.output_dir + dirname + fname + '.npy', {'corrs_t':corrs_t,'preds_t':preds_t,'test_t':test_t,'train_losses_t':train_losses_t,'test_losses_t':test_losses_t})
+        np.save(args.output_dir + dirname + fname + '.npy', {'corrs_t':corrs_t,'preds_t':preds_t,'test_t':test_t,'train_losses_t':train_losses_t,'test_losses_t':test_losses_t})
 
     

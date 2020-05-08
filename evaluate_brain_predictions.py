@@ -28,7 +28,7 @@ if __name__ == '__main__':
     
     neighborhoods = np.load('./data/voxel_neighborhoods/' + args.subject + '_ars_auto2.npy')
     n_words, n_voxels = test_t_per_feat.shape
-    ind = CV_ind(n_words, n_splits=n_folds)
+    ind = CV_ind(n_words, n_folds=n_folds)
 
     accs = np.zeros([n_folds,n_voxels])
 

@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from scipy.stats import zscore
 
-from utils.global_params import n_epochs
+from utils.global_params import n_epochs, n_splits
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -95,7 +95,7 @@ def kernel_ridge_by_lambda_svd(X, Y, Xval, Yval, lambdas=np.array([0.1,1,10,100,
         error[idx] = 1 - R2(np.dot(Xval,weights),Yval)
     return error
 
-def cross_val_ridge(train_features,train_data, n_splits = 10,
+def cross_val_ridge(train_features,train_data,
                     lambdas = np.array([10**i for i in range(-6,10)]),
                     method = 'plain',
                     do_plot = False):
@@ -145,14 +145,14 @@ def cross_val_ridge(train_features,train_data, n_splits = 10,
 
     return weights, np.array([lambdas[i] for i in argmin_lambda])
 
-def ridge_grad_descent_pred(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr):
-    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_1_size'], model_dict['hidden_2_size'], model_dict['output_size'])
+def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr):
+    X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
+    Xtest, Ytest = torch.from_numpy(Xtest).float().to(device), torch.from_numpy(Ytest).float().to(device)
+    
+    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'])
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum')
     optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
-
-    X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
-    Xtest, Ytest = torch.from_numpy(Xtest).float().to(device), torch.from_numpy(Ytest).float().to(device)
 
     # Train model with min_lmbda
     minibatch_size = model_dict['minibatch_size']
@@ -194,7 +194,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
 
     cost = np.zeros((num_lambdas, ))
     for idx,lmbda in enumerate(lambdas):
-        model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_1_size'], model_dict['hidden_2_size'], model_dict['output_size'])
+        model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'])
         model = model.to(device)
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
         optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
@@ -220,6 +220,9 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
                 batch_loss.backward()
                 optimizer.step()
                 epoch_loss += batch_loss.item()
+
+                del batch_preds
+                del batch_loss
             
             # Validation loss for current epoch
             model.eval()
@@ -233,58 +236,80 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
             cost[idx] = min_loss.item()
     return cost
 
-def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, n_splits=10,
-                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
+def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, debug=False):
     import utils.utils as general_utils
+    num_lambdas = lambdas.shape[0]
+    r_cv = np.zeros((num_lambdas,))
+
+    ind = general_utils.CV_ind(train_X.shape[0], n_folds=n_splits)
+
+    # Gather recorded costs from training with each lambda
+    for ind_num in range(n_splits):
+        if debug:
+            start_t = time.time()
+            print("======= Split {} =======".format(ind_num))
+        trn = ind!=ind_num
+        val = ind==ind_num
+
+        cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs) # cost: (num_lambdas, )
+        r_cv += cost
+        if debug:
+            end_t = time.time()
+            print("Time Elapsed: {}s".format(end_t - start_t))
+            print("========================")
+    # Identify optimal lambda and use it to generate predictions
+    argmin_lambda = np.argmin(r_cv)
+    opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
+    preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambda, opt_lr)
+
+    return preds, train_losses, test_losses
+
+def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
+                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
+    num_voxels = train_data.shape[1]
+    feat_dim = train_features.shape[1]
+    n_train, n_test = train_data.shape[0], test_data.shape[0]
 
     # Initialize appropriate encoding model
     if encoding_model == 'mlp_initial':
-        input_size, hidden_1_size, hidden_2_size, output_size = train_features.shape[1], 16, None, 1 # feat_dim, 16, 1
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16], 1, n_train//n_splits
     elif encoding_model == 'mlp_smallerhiddensize':
-        input_size, hidden_1_size, hidden_2_size, output_size = train_features.shape[1], 8, None, 1 # feat_dim, 8, 1
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [8], 1, n_train//n_splits
     elif encoding_model == 'mlp_largerhiddensize':
-        input_size, hidden_1_size, hidden_2_size, output_size = train_features.shape[1], 24, None, 1 # feat_dim, 24, 1
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [24], 1, n_train//n_splits
+    elif encoding_model == 'mlp_additionalhiddenlayer':
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16,4], 1, n_train//n_splits
+    elif encoding_model == 'mlp_allvoxels':
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, 32
+    model_dict = dict(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
+
+    if encoding_model != 'mlp_allvoxels':
+        # Train and predict for one voxel at a time
+        preds = torch.zeros((num_voxels, n_test))
+        train_losses = np.zeros((num_voxels, n_epochs))
+        test_losses = np.zeros((num_voxels, n_epochs))
+
+        start_t = time.time()
+        for ivox in range(num_voxels):
+            vox_preds, vox_train_losses, vox_test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data[:, ivox],
+                                                                                        test_features, test_data[:, ivox], lambdas, lrs)
+            
+            # Store predictions and model losses
+            preds[ivox] = vox_preds.squeeze()
+            train_losses[ivox] = vox_train_losses
+            test_losses[ivox] = vox_test_losses
+
+            if (ivox % 1000 == 0):
+                end_t = time.time()
+                print("{} vox: {}s".format(ivox, end_t - start_t))
+                start_t = end_t
+        preds = preds.T
+        # preds: (N_test, num_voxels)
+        # train_losses, test_losses: (num_voxels, n_epochs)
     else:
-        assert encoding_model == 'mlp_additionalhiddenlayer'
-        input_size, hidden_1_size, hidden_2_size, output_size = train_features.shape[1], 16, 4, 1 # feat_dim, 16, 4, 1
-    model_dict = dict(input_size=input_size, hidden_1_size=hidden_1_size, hidden_2_size=hidden_2_size, output_size=output_size, minibatch_size=train_data.shape[0]//n_splits)
-
-
-    num_voxels = train_data.shape[1]
-    num_lambdas = lambdas.shape[0]
-
-    preds_all = torch.zeros((num_voxels, test_features.shape[0]))
-    train_losses_all = np.zeros((num_voxels, n_epochs))
-    test_losses_all = np.zeros((num_voxels, n_epochs))
-
-    ind = general_utils.CV_ind(train_data.shape[0], n_splits=n_splits)
-    start_t = time.time()
-
-    for ivox in range(num_voxels):
-        r_cv = np.zeros((num_lambdas,))
-
-        # Gather recorded costs from training with each lambda
-        for ind_num in range(n_splits):
-            trn = ind!=ind_num
-            val = ind==ind_num
-            cost = ridge_by_lambda_grad_descent(model_dict, train_features[trn], train_data[trn][:, ivox], 
-                                                train_features[val], train_data[val][:, ivox], lambdas, lrs) # cost: (num_lambdas, )
-            r_cv += cost
-        
-        # Identify optimal lambda and use it to generate predictions
-        argmin_lambda = np.argmin(r_cv)
-        opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
-        preds, train_losses, test_losses = ridge_grad_descent_pred(model_dict, train_features, train_data[:, ivox], test_features, 
-                                                        test_data[:, ivox], opt_lambda, opt_lr) # preds: (N_test, 1); test_losses: (n_epochs,)
-        
-        # Store predictions and model losses
-        preds_all[ivox] = preds.squeeze()
-        train_losses_all[ivox] = train_losses
-        test_losses_all[ivox] = test_losses
-
-        if (ivox % 1000 == 0):
-            end_t = time.time()
-            print("{} vox: {}s".format(ivox, end_t - start_t))
-            start_t = end_t
-    preds_all = preds_all.T # (N_test, num_voxels)
-    return preds_all, train_losses_all, test_losses_all
+        # Train and predict for all voxels at once
+        preds, train_losses, test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data, test_features,
+                                                                                test_data, lambdas, lrs, debug=True)
+        # preds: (N_test, num_voxels)
+        # train_losses, test_losses: (n_epochs, )
+    return preds, train_losses, test_losses
