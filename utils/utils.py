@@ -171,7 +171,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         # weights: (40, 27905)
         del weights
     else:
-        vox_subdirname = 'allvoxels/' if use_all_voxels else 'roivoxels/'
+        vox_subdirname = 'maxvoxels/' if use_all_voxels else 'roivoxels/'
         assert 'mlp' in encoding_model
         preds_dir = '{}/mlp_fold_preds/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
         preds_path = preds_dir + 'fold_{}.npy'.format(ind_num)

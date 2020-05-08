@@ -48,7 +48,7 @@ if __name__ == '__main__':
                                                                 predict_feat_dict)
 
     if not args.single_fold_computation:
-        dirname = 'allvoxels/' if args.use_all_voxels else 'roivoxels/'
+        dirname = 'maxvoxels/' if args.use_all_voxels else 'roivoxels/'
         fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model)
         print('saving: {}'.format(args.output_dir + dirname + fname))
 
