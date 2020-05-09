@@ -166,7 +166,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
 
     start_time = tm.time()
     if encoding_model == 'linear':
-        weights, chosen_lambdas = cross_val_ridge(train_features, train_data, lambdas=np.array([10**i for i in (3,4)]), method='plain', do_plot=False)
+        weights, chosen_lambdas = cross_val_ridge(train_features, train_data, method='plain', do_plot=False)
         preds =  np.dot(test_features, weights)
         # weights: (40, 27905)
         del weights
@@ -186,7 +186,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
             train_losses = np.load(train_losses_path)
             test_losses = np.load(test_losses_path)
         else:
-            preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, lambdas=np.array([10**i for i in (3,4)]), lrs=np.array([1e-4,1e-4]))
+            preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data)
             preds = preds.detach().cpu().numpy()
 
             os.makedirs(preds_dir, exist_ok=True)
