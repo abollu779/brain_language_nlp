@@ -249,6 +249,8 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
 
     ind = general_utils.CV_ind(train_X.shape[0], n_folds=n_splits)
 
+    import pdb
+    pdb.set_trace()
     # Gather recorded costs from training with each lambda
     for ind_num in range(n_splits):
         if debug:
