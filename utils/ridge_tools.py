@@ -176,6 +176,9 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
             batch_loss.backward()
             optimizer.step()
 
+            del batch_preds
+            del batch_loss
+
         train_losses[epoch] = epoch_loss
         model.eval()
         preds_test = model(Xtest)
