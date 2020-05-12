@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from scipy.stats import zscore
 
-from utils.global_params import n_epochs, n_splits
+from utils.global_params import n_epochs, n_splits, mlp_allvoxels_minibatch_size
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -293,7 +293,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     elif encoding_model == 'mlp_additionalhiddenlayer':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16,4], 1, n_train//n_splits
     elif encoding_model == 'mlp_allvoxels':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, 32
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, mlp_allvoxels_minibatch_size
     model_dict = dict(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
     if encoding_model != 'mlp_allvoxels':
