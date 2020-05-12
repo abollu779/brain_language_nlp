@@ -161,9 +161,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     test_losses = np.zeros((n_epochs,))
 
     for epoch in range(n_epochs):
-        import pdb
-        pdb.set_trace()
-
         model.train()
         permutation = torch.randperm(X.shape[0])
         epoch_loss = 0
@@ -183,7 +180,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
             del batch_preds
             del batch_loss
 
-        pdb.set_trace()
         train_losses[epoch] = epoch_loss
         model.eval()
         preds_test = model(Xtest)
