@@ -153,6 +153,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum')
     optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3) # if no improvement seen in val_loss for 3 epochs, reduces lr
 
     # Train model with min_lmbda
     minibatch_size = model_dict['minibatch_size']
@@ -162,7 +163,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     for epoch in range(n_epochs):
         import pdb
         pdb.set_trace()
-        
+
         model.train()
         permutation = torch.randperm(X.shape[0])
         epoch_loss = 0
@@ -174,10 +175,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
             batch_preds = model(batch_X)
             batch_loss = criterion(batch_preds.squeeze(), batch_Y)
-            epoch_loss += batch_loss
 
             batch_loss.backward()
             optimizer.step()
+            epoch_loss += batch_loss.item()
 
             del batch_preds
             del batch_loss
@@ -189,7 +190,9 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
         if epoch == 0:
             preds_path = 'preds_epoch0.npy'
             np.save(preds_path, preds_test.detach().cpu().numpy())
-        test_losses[epoch] = criterion(preds_test.squeeze(), Ytest)
+        test_loss = criterion(preds_test.squeeze(), Ytest)
+        scheduler.step(test_loss)
+        test_losses[epoch] = test_loss.item()
 
     # Generate predictions
     model.eval()
