@@ -157,15 +157,15 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         train_data = train_data[skip:-skip,:]
         train_features = train_features[skip:-skip,:]
 
-    # normalize data
-    train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
-    test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
-    
-    train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
-    test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
-
     start_time = tm.time()
     if encoding_model == 'linear':
+        # normalize data
+        train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
+        test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
+        
+        train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
+        test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
+        
         weights, chosen_lambdas = cross_val_ridge(train_features, train_data, method='plain', do_plot=False)
         preds =  np.dot(test_features, weights)
         # weights: (40, 27905)

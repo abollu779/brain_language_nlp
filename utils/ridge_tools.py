@@ -160,6 +160,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     train_losses = np.zeros((n_epochs,))
     test_losses = np.zeros((n_epochs,))
 
+    # normalize test data
+    Xtest = np.nan_to_num(zscore(np.nan_to_num(Xtest)))
+    Ytest = np.nan_to_num(zscore(np.nan_to_num(Ytest)))
+
     for epoch in range(n_epochs):
         model.train()
         permutation = torch.randperm(X.shape[0])
@@ -169,6 +173,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
             indices = permutation[i:i+minibatch_size]
             batch_X, batch_Y = X[indices], Y[indices]
+
+            # normalize batch data
+            batch_X = np.nan_to_num(zscore(np.nan_to_num(batch_X)))
+            batch_Y = np.nan_to_num(zscore(np.nan_to_num(batch_Y)))
 
             batch_preds = model(batch_X)
             batch_loss = criterion(batch_preds.squeeze(), batch_Y)
@@ -213,6 +221,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
         minibatch_size = model_dict['minibatch_size']
         min_loss = None
 
+        # normalize validation data
+        Xval = np.nan_to_num(zscore(np.nan_to_num(Xval)))
+        Yval = np.nan_to_num(zscore(np.nan_to_num(Yval)))
+
         for epoch in range(n_epochs):
             model.train()
             permutation = torch.randperm(X.shape[0])
@@ -222,6 +234,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
 
                 indices = permutation[i:i+minibatch_size]
                 batch_X, batch_Y = X[indices], Y[indices]
+
+                # normalize batch data
+                batch_X = np.nan_to_num(zscore(np.nan_to_num(batch_X)))
+                batch_Y = np.nan_to_num(zscore(np.nan_to_num(batch_Y)))
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
