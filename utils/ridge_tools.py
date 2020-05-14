@@ -161,8 +161,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     test_losses = np.zeros((n_epochs,))
 
     # normalize test data
-    Xtest = np.nan_to_num(zscore(np.nan_to_num(Xtest)))
-    Ytest = np.nan_to_num(zscore(np.nan_to_num(Ytest)))
+    Xtest = torch.where(torch.isnan(Xtest), torch.zeros_like(Xtest), Xtest)
+    Ytest = torch.where(torch.isnan(Ytest), torch.zeros_like(Ytest), Ytest)
 
     for epoch in range(n_epochs):
         model.train()
@@ -175,8 +175,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
             batch_X, batch_Y = X[indices], Y[indices]
 
             # normalize batch data
-            batch_X = np.nan_to_num(zscore(np.nan_to_num(batch_X)))
-            batch_Y = np.nan_to_num(zscore(np.nan_to_num(batch_Y)))
+            batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X)
+            batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y)
 
             batch_preds = model(batch_X)
             batch_loss = criterion(batch_preds.squeeze(), batch_Y)
@@ -222,8 +222,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
         min_loss = None
 
         # normalize validation data
-        Xval = np.nan_to_num(zscore(np.nan_to_num(Xval)))
-        Yval = np.nan_to_num(zscore(np.nan_to_num(Yval)))
+        Xval = torch.where(torch.isnan(Xval), torch.zeros_like(Xval), Xval)
+        Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval)
 
         for epoch in range(n_epochs):
             model.train()
@@ -236,8 +236,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
                 batch_X, batch_Y = X[indices], Y[indices]
 
                 # normalize batch data
-                batch_X = np.nan_to_num(zscore(np.nan_to_num(batch_X)))
-                batch_Y = np.nan_to_num(zscore(np.nan_to_num(batch_Y)))
+                batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X)
+                batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y)
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
