@@ -165,7 +165,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         
         train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
         test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
-
+        
         weights, chosen_lambdas = cross_val_ridge(train_features, train_data, method='plain', do_plot=False)
         preds =  np.dot(test_features, weights)
         # weights: (40, 27905)
@@ -221,9 +221,6 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
         test_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
 
     all_test_data = []
-
-    # Permute data (and see if this makes a difference for subject F's fold predictions)
-    data = np.random.permutation(data) # only shuffles along first index
     
     if single_fold_computation:
         assert 'mlp' in encoding_model
