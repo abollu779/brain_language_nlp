@@ -200,6 +200,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
     # Generate predictions
     model.eval()
+    import pdb
+    pdb.set_trace()
     preds_test = model(Xtest)
     return preds_test, train_losses, test_losses
 
