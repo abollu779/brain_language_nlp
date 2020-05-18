@@ -242,6 +242,8 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
             if 'mlp' in encoding_model:
                 train_losses_d[ind_num,:] = train_losses
                 test_losses_d[ind_num,:] = test_losses
+
+            pdb.set_trace()
             
         all_test_data = np.vstack(all_test_data)
 

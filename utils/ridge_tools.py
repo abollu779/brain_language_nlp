@@ -7,7 +7,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from scipy.stats import zscore
-import pdb
 
 from utils.global_params import n_epochs, n_splits, mlp_allvoxels_minibatch_size
 from utils.mlp_encoding_utils import MLPEncodingModel
@@ -226,8 +225,6 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
         Xval = torch.where(torch.isnan(Xval), torch.zeros_like(Xval), Xval)
         Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval)
 
-        pdb.set_trace()
-
         for epoch in range(n_epochs):
             model.train()
             permutation = torch.randperm(X.shape[0])
@@ -262,7 +259,6 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
             if min_loss is None or val_loss < min_loss:
                 min_loss = val_loss
             cost[idx] = min_loss.item()
-            pdb.set_trace()
     return cost
 
 def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, debug=False):
@@ -294,7 +290,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
     return preds, train_losses, test_losses
 
 def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
-                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
+                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-5]*11+[1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11])):
     num_voxels = train_data.shape[1]
     feat_dim = train_features.shape[1]
     n_train, n_test = train_data.shape[0], test_data.shape[0]
