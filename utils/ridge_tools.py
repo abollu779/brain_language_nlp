@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from scipy.stats import zscore
+import pdb
 
 from utils.global_params import n_epochs, n_splits, mlp_allvoxels_minibatch_size
 from utils.mlp_encoding_utils import MLPEncodingModel
@@ -200,8 +201,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
     # Generate predictions
     model.eval()
-    import pdb
-    pdb.set_trace()
     preds_test = model(Xtest)
     return preds_test, train_losses, test_losses
 
@@ -226,6 +225,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
         # normalize validation data
         Xval = torch.where(torch.isnan(Xval), torch.zeros_like(Xval), Xval)
         Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval)
+
+        pdb.set_trace()
 
         for epoch in range(n_epochs):
             model.train()
@@ -261,6 +262,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
             if min_loss is None or val_loss < min_loss:
                 min_loss = val_loss
             cost[idx] = min_loss.item()
+            pdb.set_trace()
     return cost
 
 def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, debug=False):
