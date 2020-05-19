@@ -155,7 +155,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'])
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum')
-    optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
+    optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=0)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3) # if no improvement seen in val_loss for 3 epochs, reduces lr
 
     # Train model with min_lmbda
