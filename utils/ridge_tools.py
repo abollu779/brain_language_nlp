@@ -203,6 +203,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
     # Generate predictions
     model.eval()
+    import pdb
+    pdb.set_trace()
     preds_test = model(Xtest)
     return preds_test, train_losses, test_losses
 
@@ -293,7 +295,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
     return preds, train_losses, test_losses
 
 def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
-                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-5]*11+[1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11])):
+                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
     num_voxels = train_data.shape[1]
     feat_dim = train_features.shape[1]
     n_train, n_test = train_data.shape[0], test_data.shape[0]
