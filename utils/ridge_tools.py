@@ -203,7 +203,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     preds_test = model(Xtest)
     return preds_test, train_losses, test_losses
 
-def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
+def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, split):
     num_lambdas = lambdas.shape[0]
 
     X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
@@ -266,12 +266,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
 
         import os
         losses_dir_path = 'mlp_allvoxels_losses/lambda{}/'.format(idx)
-        epoch_losses_path, val_losses_path = losses_dir_path + 'train_split.npy', losses_dir_path + 'val_split.npy'
+        epoch_losses_path, val_losses_path = losses_dir_path + 'train_split{}.npy'.format(split), losses_dir_path + 'val_split{}.npy'.format(split)
         os.makedirs(losses_dir_path, exist_ok=True)
         np.save(epoch_losses_path, epoch_losses)
         np.save(val_losses_path, val_losses)
-        import pdb
-        pdb.set_trace()
 
     return cost
 
@@ -290,7 +288,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         trn = ind!=ind_num
         val = ind==ind_num
 
-        cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs) # cost: (num_lambdas, )
+        cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs, ind_num) # cost: (num_lambdas, )
         r_cv += cost
         if debug:
             end_t = time.time()
