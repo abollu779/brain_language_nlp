@@ -203,8 +203,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
     # Generate predictions
     model.eval()
-    import pdb
-    pdb.set_trace()
     preds_test = model(Xtest)
     return preds_test, train_losses, test_losses
 
@@ -282,6 +280,8 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         val = ind==ind_num
 
         cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs) # cost: (num_lambdas, )
+        import pdb
+        pdb.set_trace()
         r_cv += cost
         if debug:
             end_t = time.time()
