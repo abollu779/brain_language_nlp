@@ -194,9 +194,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
         train_losses[epoch] = epoch_loss
         model.eval()
         preds_test = model(Xtest)
-        if epoch == 0:
-            preds_path = 'preds_epoch0.npy'
-            np.save(preds_path, preds_test.detach().cpu().numpy())
         test_loss = criterion(preds_test.squeeze(), Ytest)
         scheduler.step(test_loss)
         test_losses[epoch] = test_loss.item()
@@ -213,6 +210,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
     Xval, Yval = torch.from_numpy(Xval).float().to(device), torch.from_numpy(Yval).float().to(device)
 
     cost = np.zeros((num_lambdas, ))
+    epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs)), np.zeros((num_lambdas, n_epochs))
     for idx,lmbda in enumerate(lambdas):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'])
         model = model.to(device)
@@ -259,9 +257,19 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs):
 
             scheduler.step(val_loss)
 
+            epoch_losses[idx, epoch] = epoch_loss
+            val_losses[idx, epoch] = val_loss.item()
+
             if min_loss is None or val_loss < min_loss:
                 min_loss = val_loss
             cost[idx] = min_loss.item()
+
+        epoch_losses_path, val_losses_path = 'epoch_losses.npy', 'val_losses.npy'
+        np.save(epoch_losses_path, epoch_losses)
+        np.save(val_losses_path, val_losses)
+        import pdb
+        pdb.set_trace()
+
     return cost
 
 def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, debug=False):
@@ -280,8 +288,6 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         val = ind==ind_num
 
         cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs) # cost: (num_lambdas, )
-        import pdb
-        pdb.set_trace()
         r_cv += cost
         if debug:
             end_t = time.time()
