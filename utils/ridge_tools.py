@@ -264,12 +264,11 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 min_loss = val_loss
             cost[idx] = min_loss.item()
 
-        import os
-        losses_dir_path = 'mlp_allvoxels_losses/lambda{}/'.format(idx)
-        epoch_losses_path, val_losses_path = losses_dir_path + 'train_split{}.npy'.format(split), losses_dir_path + 'val_split{}.npy'.format(split)
-        os.makedirs(losses_dir_path, exist_ok=True)
-        np.save(epoch_losses_path, epoch_losses)
-        np.save(val_losses_path, val_losses)
+    import os
+    epoch_losses_path, val_losses_path = 'mlp_allvoxels_losses/train_split{}.npy'.format(split), 'mlp_allvoxels_losses/val_split{}.npy'.format(split)
+    os.makedirs('mlp_allvoxels_losses/', exist_ok=True)
+    np.save(epoch_losses_path, epoch_losses)
+    np.save(val_losses_path, val_losses)
 
     return cost
 
