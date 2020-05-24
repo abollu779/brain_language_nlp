@@ -342,8 +342,8 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
             
             # Store predictions and model losses
             preds[ivox] = vox_preds.squeeze()
-            train_losses[ivox] = vox_train_losses
-            test_losses[ivox] = vox_test_losses
+            train_losses[ivox] = vox_train_losses.squeeze()
+            test_losses[ivox] = vox_test_losses.squeeze()
 
             if (ivox % 1000 == 0):
                 end_t = time.time()
