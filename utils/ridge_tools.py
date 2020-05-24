@@ -194,7 +194,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, argmin_lam
                     batch_loss.backward()
                 else:
                     for i in range(len(batch_loss)):
-                        batch_loss[i].backward()
+                        batch_loss[i].backward(retain_graph=True)
 
                 optimizer.step()
                 epoch_loss += batch_loss.detach().cpu()
@@ -256,7 +256,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                     batch_loss.backward()
                 else:
                     for i in range(len(batch_loss)):
-                        batch_loss[i].backward()
+                        batch_loss[i].backward(retain_graph=True)
                 optimizer.step()
                 epoch_loss += batch_loss.detach()
 
