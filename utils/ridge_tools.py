@@ -166,8 +166,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, argmin_lam
 
         # Train model with min_lmbda
         minibatch_size = model_dict['minibatch_size']
-        train_losses = np.zeros((n_epochs, num_voxels))
-        test_losses = np.zeros((n_epochs, num_voxels))
+        train_losses = torch.zeros((n_epochs, num_voxels))
+        test_losses = torch.zeros((n_epochs, num_voxels))
 
         # normalize test data
         Xtest = torch.where(torch.isnan(Xtest), torch.zeros_like(Xtest), Xtest)
@@ -197,7 +197,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, argmin_lam
                         batch_loss[i].backward()
 
                 optimizer.step()
-                epoch_loss += batch_loss.detach()
+                epoch_loss += batch_loss.detach().cpu()
 
                 del batch_preds
                 del batch_loss
@@ -206,7 +206,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, argmin_lam
             model.eval()
             preds_test = model(Xtest)
             test_loss = criterion(preds_test.squeeze(), Ytest).sum(dim=0)
-            test_losses[epoch] = test_loss.detach()
+            test_losses[epoch] = test_loss.detach().cpu()
 
         idx_vox = argmin_lambda == idx
         preds_test_all[:, idx_vox] = preds_test[:, idx_vox]
@@ -220,8 +220,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
     Xval, Yval = torch.from_numpy(Xval).float().to(device), torch.from_numpy(Yval).float().to(device)
 
-    cost = np.zeros((num_lambdas, num_voxels))
-    epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs, num_voxels)), np.zeros((num_lambdas, n_epochs, num_voxels))
+    cost = torch.zeros((num_lambdas, num_voxels))
+    epoch_losses, val_losses = torch.zeros((num_lambdas, n_epochs, num_voxels)), torch.zeros((num_lambdas, n_epochs, num_voxels))
     for idx,lmbda in enumerate(lambdas):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'])
         model = model.to(device)
@@ -269,12 +269,9 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             val_loss = criterion(preds_val.squeeze(), Yval).sum(dim=0)
 
             epoch_losses[idx, epoch] = epoch_loss
-            val_losses[idx, epoch] = val_loss.detach()
+            val_losses[idx, epoch] = val_loss.detach().cpu()
 
-            cost[idx] = val_loss.detach()
-
-    import pdb
-    pdb.set_trace()
+            cost[idx] = val_loss.detach().cpu()
 
     import os
     epoch_losses_path, val_losses_path = 'mlp_allvoxels_losses/train_split{}.npy'.format(split), 'mlp_allvoxels_losses/val_split{}.npy'.format(split)
@@ -288,7 +285,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
     import utils.utils as general_utils
     num_lambdas = lambdas.shape[0]
     num_voxels = 1 if (len(train_Y.shape) == 1) else train_Y.shape[1]
-    r_cv = np.zeros((num_lambdas, num_voxels))
+    r_cv = torch.zeros((num_lambdas, num_voxels))
 
     ind = general_utils.CV_ind(train_X.shape[0], n_folds=n_splits)
 
@@ -335,8 +332,8 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     if encoding_model != 'mlp_allvoxels':
         # Train and predict for one voxel at a time
         preds = torch.zeros((num_voxels, n_test))
-        train_losses = np.zeros((num_voxels, n_epochs))
-        test_losses = np.zeros((num_voxels, n_epochs))
+        train_losses = torch.zeros((num_voxels, n_epochs))
+        test_losses = torch.zeros((num_voxels, n_epochs))
 
         start_t = time.time()
         for ivox in range(num_voxels):
