@@ -209,7 +209,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, argmin_lam
             test_losses[epoch] = test_loss.detach().cpu()
 
         idx_vox = argmin_lambda == idx
-        preds_test_all[:, idx_vox] = preds_test[:, idx_vox]
+        preds_test_all[:, idx_vox] = preds_test[:, idx_vox].detach().cpu()
 
     return preds_test, train_losses, test_losses
 
