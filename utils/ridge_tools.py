@@ -156,7 +156,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum')
     optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3) # if no improvement seen in val_loss for 3 epochs, reduces lr
 
     # Train model with min_lmbda
     minibatch_size = model_dict['minibatch_size']
@@ -186,7 +185,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
             batch_loss.backward()
             optimizer.step()
-            epoch_loss += batch_loss.item()
+            epoch_loss += batch_loss.detach()
 
             del batch_preds
             del batch_loss
@@ -195,8 +194,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
         model.eval()
         preds_test = model(Xtest)
         test_loss = criterion(preds_test.squeeze(), Ytest)
-        scheduler.step(test_loss)
-        test_losses[epoch] = test_loss.item()
+        test_losses[epoch] = test_loss.detach()
 
     # Generate predictions
     model.eval()
@@ -216,11 +214,9 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         model = model.to(device)
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
         optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3) # if no improvement seen in val_loss for 3 epochs, reduces lr
 
         # Train model with current lambda
         minibatch_size = model_dict['minibatch_size']
-        min_loss = None
 
         # normalize validation data
         Xval = torch.where(torch.isnan(Xval), torch.zeros_like(Xval), Xval)
@@ -245,7 +241,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
                 batch_loss.backward()
                 optimizer.step()
-                epoch_loss += batch_loss.item()
+                epoch_loss += batch_loss.detach()
 
                 del batch_preds
                 del batch_loss
@@ -255,14 +251,9 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             preds_val = model(Xval)
             val_loss = criterion(preds_val.squeeze(), Yval)
 
-            scheduler.step(val_loss)
-
             epoch_losses[idx, epoch] = epoch_loss
-            val_losses[idx, epoch] = val_loss.item()
-
-            if min_loss is None or val_loss < min_loss:
-                min_loss = val_loss
-            cost[idx] = min_loss.item()
+            val_losses[idx, epoch] = val_loss.detach()
+        cost[idx] = val_loss.detach()
 
     import os
     epoch_losses_path, val_losses_path = 'mlp_allvoxels_losses/train_split{}.npy'.format(split), 'mlp_allvoxels_losses/val_split{}.npy'.format(split)
