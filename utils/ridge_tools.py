@@ -203,7 +203,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, argmin_lam
             model.eval()
             preds_test = model(Xtest)
             test_loss = criterion_test(preds_test.squeeze(), Ytest).sum(dim=0)
-            tmp_test_losses[epoch] = test_loss.detach()
+            tmp_test_losses[epoch] = test_loss.detach().cpu()
 
         idx_vox = argmin_lambda == idx
         test_losses[:, idx_vox] = tmp_test_losses[:, idx_vox]
