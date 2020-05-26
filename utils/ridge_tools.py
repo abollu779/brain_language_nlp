@@ -9,7 +9,7 @@ import torch.optim as optim
 from scipy.stats import zscore
 
 from utils.global_params import n_epochs, n_splits, mlp_allvoxels_minibatch_size
-from utils.mlp_encoding_utils import MLPEncodingModel
+from utils.mlp_encoding_utils import MLPEncodingModel, SGD_by_voxel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
@@ -163,7 +163,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, argmin_lam
         model = model.to(device)
         criterion = nn.MSELoss(reduction='sum')
         criterion_test = nn.MSELoss(reduction='none')
-        optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda)
+        optimizer = SGD_by_voxel(model.parameters(), lr=lrs[idx], weight_decay=lmbda)
 
         # Train model with min_lmbda
         minibatch_size = model_dict['minibatch_size']
