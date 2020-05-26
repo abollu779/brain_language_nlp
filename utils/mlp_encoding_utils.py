@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .optimizer import Optimizer, required
+from torch.optim import Optimizer
 
 class MLPEncodingModel(nn.Module):
     def __init__(self, input_size, hidden_sizes, output_size, is_mlp_allvoxels = False):
@@ -79,9 +79,11 @@ class SGD_by_voxel(Optimizer):
         The Nesterov version is analogously modified.
     """
 
-    def __init__(self, params, lr=required, momentum=0, dampening=0,
+    def __init__(self, params, lr=None, momentum=0, dampening=0,
                  weight_decay=0, nesterov=False):
-        if lr is not required and lr < 0.0:
+        if lr is None:
+            raise ValueError("Need to enter a valid learning rate: {}".format(lr))
+        if lr is not None and lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if momentum < 0.0:
             raise ValueError("Invalid momentum value: {}".format(momentum))
