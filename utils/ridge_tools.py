@@ -148,71 +148,83 @@ def cross_val_ridge(train_features,train_data,
 
     return weights, np.array([lambdas[i] for i in argmin_lambda])
 
-def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, is_mlp_allvoxels=False):
+def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, argmin_lambda, lambdas, lrs, is_mlp_allvoxels=False):
+    num_voxels = 1 if (len(Y.shape) == 1) else Y.shape[1]
+
     X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
     Xtest, Ytest = torch.from_numpy(Xtest).float().to(device), torch.from_numpy(Ytest).float().to(device)
     
-    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels)
-    model = model.to(device)
-    criterion = nn.MSELoss(reduction='sum')
-    optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
+    preds_test_all = torch.zeros(Ytest.shape[0], num_voxels)
 
-    # Train model with min_lmbda
-    minibatch_size = model_dict['minibatch_size']
-    train_losses = np.zeros((n_epochs,))
-    test_losses = np.zeros((n_epochs,))
+    for idx, lmbda in enumerate(lambdas):
+        if idx not in argmin_lambda:
+            continue
+        model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels)
+        model = model.to(device)
+        criterion = nn.MSELoss(reduction='sum')
+        criterion_test = nn.MSELoss(reduction='none')
+        optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda)
 
-    # normalize test data
-    Xtest = torch.where(torch.isnan(Xtest), torch.zeros_like(Xtest), Xtest)
-    Ytest = torch.where(torch.isnan(Ytest), torch.zeros_like(Ytest), Ytest)
+        # Train model with min_lmbda
+        minibatch_size = model_dict['minibatch_size']
+        train_losses = np.zeros((n_epochs,))
+        test_losses = np.zeros((n_epochs, num_voxels))
+        tmp_test_losses = np.zeros((n_epochs, num_voxels))
 
-    for epoch in range(n_epochs):
-        model.train()
-        permutation = torch.randperm(X.shape[0])
-        epoch_loss = 0
-        for i in range(0, X.shape[0], minibatch_size):
-            optimizer.zero_grad()
+        # normalize test data
+        Xtest = torch.where(torch.isnan(Xtest), torch.zeros_like(Xtest), Xtest)
+        Ytest = torch.where(torch.isnan(Ytest), torch.zeros_like(Ytest), Ytest)
 
-            indices = permutation[i:i+minibatch_size]
-            batch_X, batch_Y = X[indices], Y[indices]
+        for epoch in range(n_epochs):
+            model.train()
+            permutation = torch.randperm(X.shape[0])
+            epoch_loss = 0
+            for i in range(0, X.shape[0], minibatch_size):
+                optimizer.zero_grad()
 
-            # normalize batch data
-            batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X)
-            batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y)
+                indices = permutation[i:i+minibatch_size]
+                batch_X, batch_Y = X[indices], Y[indices]
 
-            batch_preds = model(batch_X)
-            batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+                # normalize batch data
+                batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X)
+                batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y)
 
-            batch_loss.backward()
-            optimizer.step()
-            epoch_loss += batch_loss.detach()
+                batch_preds = model(batch_X)
+                batch_loss = criterion(batch_preds.squeeze(), batch_Y)
 
-            del batch_preds
-            del batch_loss
+                batch_loss.backward()
+                optimizer.step()
+                epoch_loss += batch_loss.detach()
 
-        train_losses[epoch] = epoch_loss
-        model.eval()
-        preds_test = model(Xtest)
-        test_loss = criterion(preds_test.squeeze(), Ytest)
-        test_losses[epoch] = test_loss.detach()
+                del batch_preds
+                del batch_loss
 
-    # Generate predictions
-    model.eval()
-    preds_test = model(Xtest)
+            train_losses[epoch] = epoch_loss
+            model.eval()
+            preds_test = model(Xtest)
+            test_loss = criterion_test(preds_test.squeeze(), Ytest).sum(dim=0)
+            tmp_test_losses[epoch] = test_loss.detach()
+
+        idx_vox = argmin_lambda == idx
+        test_losses[:, idx_vox] = tmp_test_losses[:, idx_vox]
+        preds_test_all[:, idx_vox] = preds_test[:, idx_vox].detach().cpu()
+
     return preds_test, train_losses, test_losses
 
 def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, split, is_mlp_allvoxels=False):
     num_lambdas = lambdas.shape[0]
+    num_voxels = 1 if (len(Y.shape) == 1) else Y.shape[1]
 
     X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
     Xval, Yval = torch.from_numpy(Xval).float().to(device), torch.from_numpy(Yval).float().to(device)
 
-    cost = np.zeros((num_lambdas, ))
-    epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs)), np.zeros((num_lambdas, n_epochs))
+    cost = np.zeros((num_lambdas, num_voxels))
+    epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs)), np.zeros((num_lambdas, n_epochs, num_voxels))
     for idx,lmbda in enumerate(lambdas):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
+        criterion_val = nn.MSELoss(reduction='none') # store val squared errors for every voxel
         optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
         minibatch_size = model_dict['minibatch_size']
 
@@ -247,11 +259,11 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             # Validation loss for current epoch
             model.eval()
             preds_val = model(Xval)
-            val_loss = criterion(preds_val.squeeze(), Yval)
+            val_loss = criterion_val(preds_val.squeeze(), Yval).sum(dim=0)
 
             epoch_losses[idx, epoch] = epoch_loss
-            val_losses[idx, epoch] = val_loss.detach()
-        cost[idx] = val_loss.detach()
+            val_losses[idx, epoch] = val_loss.detach().cpu()
+        cost[idx] = val_loss.detach().cpu()
 
     import os
     epoch_losses_path, val_losses_path = 'mlp_allvoxels_losses/train_split{}.npy'.format(split), 'mlp_allvoxels_losses/val_split{}.npy'.format(split)
@@ -264,7 +276,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, is_mlp_allvoxels=False):
     import utils.utils as general_utils
     num_lambdas = lambdas.shape[0]
-    r_cv = np.zeros((num_lambdas,))
+    num_voxels = 1 if (len(train_Y.shape) == 1) else train_Y.shape[1]
+    r_cv = np.zeros((num_lambdas, num_voxels))
 
     ind = general_utils.CV_ind(train_X.shape[0], n_folds=n_splits)
 
@@ -283,9 +296,8 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
             print("Time Elapsed: {}s".format(end_t - start_t))
             print("========================")
     # Identify optimal lambda and use it to generate predictions
-    argmin_lambda = np.argmin(r_cv)
-    opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
-    preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambda, opt_lr, is_mlp_allvoxels=is_mlp_allvoxels)
+    argmin_lambda = np.argmin(r_cv, 0)
+    preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, argmin_lambda, lambdas, lrs, is_mlp_allvoxels=is_mlp_allvoxels)
 
     return preds, train_losses, test_losses
 
@@ -305,7 +317,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     elif encoding_model == 'mlp_additionalhiddenlayer':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16,4], 1, n_train//n_splits
     elif encoding_model == 'mlp_allvoxels':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, mlp_allvoxels_minibatch_size
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, mlp_allvoxels_minibatch_size
     model_dict = dict(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
     if encoding_model != 'mlp_allvoxels':
