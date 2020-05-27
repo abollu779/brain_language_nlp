@@ -113,7 +113,7 @@ class SGD_by_voxel(Optimizer):
                         d_p = buf
 
                 if p.shape[0] == 640: # Input -> Hidden Weights
-                    d_p = d_p.add(p, alpha=-group['lr_mode'])
+                    p = p.add(d_p, alpha=-group['lr_mode'])
                 else: # Hidden -> Output Weights
                     p = p + (torch.mul(d_p.T, -lrs)).T
 
