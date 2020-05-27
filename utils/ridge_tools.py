@@ -289,7 +289,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
             print("========================")
     # Identify optimal lambda and use it to generate predictions
     argmin_lambda = np.argmin(r_cv, 0)
-    vox_lambdas, vox_lrs = torch.from_numpy(lambdas[argmin_lambda]), torch.from_numpy(lrs[argmin_lambda])
+    vox_lambdas, vox_lrs = lambdas[argmin_lambda], lrs[argmin_lambda]
     preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, vox_lambdas, vox_lrs, is_mlp_allvoxels=is_mlp_allvoxels)
 
     return preds, train_losses, test_losses

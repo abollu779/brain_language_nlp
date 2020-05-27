@@ -1,7 +1,10 @@
+import numpy as np
 from scipy import stats
 import torch
 import torch.nn as nn
 from torch.optim import Optimizer
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class MLPEncodingModel(nn.Module):
     def __init__(self, input_size, hidden_sizes, output_size, is_mlp_allvoxels = False):
@@ -38,21 +41,27 @@ Using it on any other model would probably result in unpredictable results as it
 class SGD_by_voxel(Optimizer):
     def __init__(self, params, lrs=None, momentum=0, dampening=0,
                  weight_decays=None, nesterov=False):
-        # weight_decay_1 is the weight decay applied to layer 1 of mlp_allvoxels
-        # weight_decays_2 are the weight decays applied to each voxel output in layer 2 of mlp_allvoxels
-        if lrs is None or type(lrs).__module__  != torch.__name__:
-            raise ValueError("Need to enter a valid torch array of learning rates: {}".format(lrs))
+        if lrs is None or type(lrs).__module__  != np.__name__:
+            raise ValueError("Need to enter a valid np array of learning rates: {}".format(lrs))
         if (lrs < 0.0).sum() > 0:
             raise ValueError("Invalid learning rate detected (< 0): {}".format(lrs))
         if momentum < 0.0:
             raise ValueError("Invalid momentum value: {}".format(momentum))
-        if weight_decays is not None and type(weight_decays).__module__  != torch.__name__:
-            raise ValueError("Weight decays must be provided as an torch array: {}".format(weight_decays))
+        if weight_decays is not None and type(weight_decays).__module__  != np.__name__:
+            raise ValueError("Weight decays must be provided as a np array: {}".format(weight_decays))
         if weight_decays is not None and (weight_decays < 0.0).sum() > 0:
             raise ValueError("Invalid weight_decay value detected: {}".format(weight_decays))
 
+        lr_mode = stats.mode(lrs)[0][0]
+        lrs = torch.from_numpy(lrs).to(device)
+        weight_decay_mode = None
+        if weight_decays is not None:
+            weight_decay_mode = stats.mode(weight_decays)[0][0]
+            weight_decays = torch.from_numpy(weight_decays).to(device)
+
         defaults = dict(lrs=lrs, momentum=momentum, dampening=dampening,
-                        weight_decays=weight_decays, nesterov=nesterov)
+                        weight_decays=weight_decays, nesterov=nesterov, 
+                        lr_mode=lr_mode, weight_decay_mode=weight_decay_mode)
         if nesterov and (momentum <= 0 or dampening != 0):
             raise ValueError("Nesterov momentum requires a momentum and zero dampening")
         super(SGD_by_voxel, self).__init__(params, defaults)
@@ -88,8 +97,7 @@ class SGD_by_voxel(Optimizer):
                 d_p = p.grad
                 if weight_decays is not None:
                     if p.shape[0] == 640: # Input -> Hidden Weights
-                        weight_decay_mode = stats.mode(weight_decays)[0]
-                        d_p = d_p.add(p, alpha=weight_decay_mode[0])
+                        d_p = d_p.add(p, alpha=group['weight_decay_mode'])
                     else: # Hidden -> Output Weights
                         d_p = d_p + (torch.mul(p.T, weight_decays)).T
                 if momentum != 0:
@@ -105,8 +113,7 @@ class SGD_by_voxel(Optimizer):
                         d_p = buf
 
                 if p.shape[0] == 640: # Input -> Hidden Weights
-                    lr_mode = stats.mode(lrs)[0]
-                    d_p = d_p.add(p, alpha=-lr_mode[0])
+                    d_p = d_p.add(p, alpha=-group['lr_mode'])
                 else: # Hidden -> Output Weights
                     p = p + (torch.mul(d_p.T, -lrs)).T
 
