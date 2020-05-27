@@ -1,3 +1,4 @@
+from scipy import stats
 import torch
 import torch.nn as nn
 from torch.optim import Optimizer
@@ -29,69 +30,29 @@ class MLPEncodingModel(nn.Module):
 # pytorch docs and adjusted to use
 # optimal lambdas and lrs per voxel
 ########################################
+"""
+IMPORTANT:
+This criterion should only be used with mlp_allvoxels architecture (where output layer is of size num_voxels).
+Using it on any other model would probably result in unpredictable results as it was designed with this use in mind.
+"""
 class SGD_by_voxel(Optimizer):
-    """Implements stochastic gradient descent (optionally with momentum).
-
-    Nesterov momentum is based on the formula from
-    `On the importance of initialization and momentum in deep learning`__.
-
-    Args:
-        params (iterable): iterable of parameters to optimize or dicts defining
-            parameter groups
-        lr (float): learning rate
-        momentum (float, optional): momentum factor (default: 0)
-        weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
-        dampening (float, optional): dampening for momentum (default: 0)
-        nesterov (bool, optional): enables Nesterov momentum (default: False)
-
-    Example:
-        >>> optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-        >>> optimizer.zero_grad()
-        >>> loss_fn(model(input), target).backward()
-        >>> optimizer.step()
-
-    __ http://www.cs.toronto.edu/%7Ehinton/absps/momentum.pdf
-
-    .. note::
-        The implementation of SGD with Momentum/Nesterov subtly differs from
-        Sutskever et. al. and implementations in some other frameworks.
-
-        Considering the specific case of Momentum, the update can be written as
-
-        .. math::
-            \begin{aligned}
-                v_{t+1} & = \mu * v_{t} + g_{t+1}, \\
-                p_{t+1} & = p_{t} - \text{lr} * v_{t+1},
-            \end{aligned}
-
-        where :math:`p`, :math:`g`, :math:`v` and :math:`\mu` denote the 
-        parameters, gradient, velocity, and momentum respectively.
-
-        This is in contrast to Sutskever et. al. and
-        other frameworks which employ an update of the form
-
-        .. math::
-            \begin{aligned}
-                v_{t+1} & = \mu * v_{t} + \text{lr} * g_{t+1}, \\
-                p_{t+1} & = p_{t} - v_{t+1}.
-            \end{aligned}
-
-        The Nesterov version is analogously modified.
-    """
-
-    def __init__(self, params, lr=None, momentum=0, dampening=0,
-                 weight_decay=0, nesterov=False):
-        if lr is None:
-            raise ValueError("Need to enter a valid learning rate: {}".format(lr))
-        if lr is not None and lr < 0.0:
-            raise ValueError("Invalid learning rate: {}".format(lr))
+    def __init__(self, params, lrs=None, momentum=0, dampening=0,
+                 weight_decays=None, nesterov=False):
+        # weight_decay_1 is the weight decay applied to layer 1 of mlp_allvoxels
+        # weight_decays_2 are the weight decays applied to each voxel output in layer 2 of mlp_allvoxels
+        if lrs is None or type(lrs).__module__  != torch.__name__:
+            raise ValueError("Need to enter a valid torch array of learning rates: {}".format(lrs))
+        if (lrs < 0.0).sum() > 0:
+            raise ValueError("Invalid learning rate detected (< 0): {}".format(lrs))
         if momentum < 0.0:
             raise ValueError("Invalid momentum value: {}".format(momentum))
-        if weight_decay < 0.0:
-            raise ValueError("Invalid weight_decay value: {}".format(weight_decay))
+        if weight_decays is not None and type(weight_decays).__module__  != torch.__name__:
+            raise ValueError("Weight decays must be provided as an torch array: {}".format(weight_decays))
+        if weight_decays is not None and (weight_decays < 0.0).sum() > 0:
+            raise ValueError("Invalid weight_decay value detected: {}".format(weight_decays))
 
-        defaults = dict(lr=lr, momentum=momentum, dampening=dampening,
-                        weight_decay=weight_decay, nesterov=nesterov)
+        defaults = dict(lrs=lrs, momentum=momentum, dampening=dampening,
+                        weight_decays=weight_decays, nesterov=nesterov)
         if nesterov and (momentum <= 0 or dampening != 0):
             raise ValueError("Nesterov momentum requires a momentum and zero dampening")
         super(SGD_by_voxel, self).__init__(params, defaults)
@@ -115,7 +76,8 @@ class SGD_by_voxel(Optimizer):
                 loss = closure()
 
         for group in self.param_groups:
-            weight_decay = group['weight_decay']
+            lrs = group['lrs']
+            weight_decays = group['weight_decays']
             momentum = group['momentum']
             dampening = group['dampening']
             nesterov = group['nesterov']
@@ -124,8 +86,12 @@ class SGD_by_voxel(Optimizer):
                 if p.grad is None:
                     continue
                 d_p = p.grad
-                if weight_decay != 0:
-                    d_p = d_p.add(p, alpha=weight_decay)
+                if weight_decays is not None:
+                    if p.shape[0] == 640: # Input -> Hidden Weights
+                        weight_decay_mode = stats.mode(weight_decays)[0]
+                        d_p = d_p.add(p, alpha=weight_decay_mode[0])
+                    else: # Hidden -> Output Weights
+                        d_p = d_p + (torch.mul(p.T, weight_decays)).T
                 if momentum != 0:
                     param_state = self.state[p]
                     if 'momentum_buffer' not in param_state:
@@ -138,6 +104,10 @@ class SGD_by_voxel(Optimizer):
                     else:
                         d_p = buf
 
-                p.add_(d_p, alpha=-group['lr'])
+                if p.shape[0] == 640: # Input -> Hidden Weights
+                    lr_mode = stats.mode(lrs)[0]
+                    d_p = d_p.add(p, alpha=-lr_mode[0])
+                else: # Hidden -> Output Weights
+                    p = p + (torch.mul(d_p.T, -lrs)).T
 
         return loss
