@@ -158,7 +158,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, vox_lambda
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum')
     criterion_test = nn.MSELoss(reduction='none')
-    optimizer = SGD_by_voxel(model.parameters(), lrs=vox_lrs, weight_decays=vox_lambdas)
+    # optimizer = SGD_by_voxel(model.parameters(), lrs=vox_lrs, weight_decays=vox_lambdas)
+    from scipy import stats
+    optimizer = SGD_by_voxel(model.parameters(), lrs=vox_lrs)
+    vox_lambda_mode = stats.mode(vox_lambdas)[0][0]
 
     # Train model with min_lmbda
     minibatch_size = model_dict['minibatch_size']
@@ -185,6 +188,9 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, vox_lambda
 
             batch_preds = model(batch_X)
             batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+            regularization_layer_1 = ((model.state_dict()['model.0.weight']**2).sum() + (model.state_dict()['model.0.bias']**2).sum()) * vox_lambda_mode
+            regularization_layer_2 = (torch.mul((model.state_dict()['model.2.weight']**2).T, vox_lambdas).T).sum() + (torch.mul((model.state_dict()['model.2.bias']**2).T, vox_lambdas).T).sum()
+            batch_loss = batch_loss + regularization_layer_1 + regularization_layer_2
 
             batch_loss.backward()
             optimizer.step()
