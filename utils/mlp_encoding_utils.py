@@ -97,9 +97,9 @@ class SGD_by_voxel(Optimizer):
                 d_p = p.grad
                 if weight_decays is not None:
                     if p.shape[0] == 640: # Input -> Hidden Weights
-                        d_p = d_p.add(p, alpha=group['weight_decay_mode'])
+                        d_p = d_p.add(p, alpha=2*group['weight_decay_mode'])
                     else: # Hidden -> Output Weights
-                        d_p = d_p + (torch.mul(p.T, weight_decays)).T
+                        d_p = d_p + (torch.mul(p.T, 2*weight_decays)).T
                 if momentum != 0:
                     param_state = self.state[p]
                     if 'momentum_buffer' not in param_state:
