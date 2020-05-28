@@ -162,6 +162,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, vox_lambda
     from scipy import stats
     optimizer = SGD_by_voxel(model.parameters(), lrs=vox_lrs)
     vox_lambda_mode = stats.mode(vox_lambdas)[0][0]
+    vox_lambdas = torch.from_numpy(vox_lambdas).to(device)
 
     # Train model with min_lmbda
     minibatch_size = model_dict['minibatch_size']
