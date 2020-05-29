@@ -223,7 +223,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
         preds_d = np.zeros((n_words, n_voxels))
         train_losses_d, test_losses_d = None, None
         if 'mlp' in encoding_model:
-            train_losses_d = np.zeros((n_folds, n_epochs, n_voxels))
+            train_losses_d = np.zeros((n_folds, n_epochs))
             test_losses_d = np.zeros((n_folds, n_epochs, n_voxels))
         all_test_data = []
         
@@ -234,12 +234,12 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
             corrs, preds, train_losses, test_losses, test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_ind, 
                                                                                                         data, predict_feat_dict)
             all_test_data.append(test_data)
-            corrs_d[ind_num,:] = corrs
+            corrs_d[ind_num] = corrs
             preds_d[test_ind] = preds
 
             if 'mlp' in encoding_model:
-                train_losses_d[ind_num,:] = train_losses
-                test_losses_d[ind_num,:] = test_losses
+                train_losses_d[ind_num] = train_losses
+                test_losses_d[ind_num] = test_losses
             
         all_test_data = np.vstack(all_test_data)
 
