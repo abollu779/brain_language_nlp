@@ -38,6 +38,10 @@ if __name__ == '__main__':
 
     # loading fMRI data
     data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
+    # TODO: If a model can be trained for a third of the data, ensure there's a 
+    # loop that trains models for the remaining two-thirds later
+    num_voxels = data.shape[1]
+    data = data[:, :num_voxels//3]
 
     # limit to ROI data
     if not args.use_all_voxels:
