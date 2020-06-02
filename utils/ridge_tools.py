@@ -148,10 +148,14 @@ def cross_val_ridge(train_features,train_data,
 
     return weights, np.array([lambdas[i] for i in argmin_lambda])
 
-def zero_unused_gradients(self, grad_in, grad_out):
-    import pdb
-    pdb.set_trace()
-    return grad_out
+def zero_unused_gradients(grad):
+    num_voxels = grad.shape[0]
+    for i in range(num_voxels):
+        scol = 16*i
+        ecol = scol + 16
+        grad[:i, scol:ecol] = 0
+        grad[i+1:, scol:ecol] = 0
+    return grad
 
 def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, is_mlp_allvoxels=False):
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
@@ -163,7 +167,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
     if is_mlp_allvoxels:
         # Register backward hook function for second layer's weights tensor
-        model.model[2].weight.register_backward_hook(zero_unused_gradients)
+        model.model[2].weight.register_hook(zero_unused_gradients)
 
     # Train model with min_lmbda
     minibatch_size = model_dict['minibatch_size']
@@ -199,7 +203,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
             del batch_Y
             del batch_preds
             del batch_loss
-
+        
         train_losses[epoch] = epoch_loss
         model.eval()
         preds_test = model(Xtest)
@@ -236,6 +240,9 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
         optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
         minibatch_size = model_dict['minibatch_size']
+        if is_mlp_allvoxels:
+            # Register backward hook function for second layer's weights tensor
+            model.model[2].weight.register_hook(zero_unused_gradients)
 
         for epoch in range(n_epochs):
             model.train()
