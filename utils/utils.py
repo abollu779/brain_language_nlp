@@ -225,8 +225,12 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
         assert 'mlp' in encoding_model
         train_ind = ind!=fold_num
         test_ind = ind==fold_num
+        import time
+        s_t = time.time()
         corrs, preds, train_losses, test_losses, test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
                                                                                                         data, predict_feat_dict)
+        e_t = time.time()
+        print("Single fold time: {}s".format(e_t - s_t))
     else: 
         # Train across all folds
         for ind_num in range(n_folds):

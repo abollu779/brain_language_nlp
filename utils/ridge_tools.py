@@ -358,10 +358,10 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
             train_losses[ivox] = vox_train_losses
             test_losses[ivox] = vox_test_losses
 
-            if (ivox % 1000 == 0):
-                end_t = time.time()
-                print("{} vox: {}s".format(ivox, end_t - start_t))
-                start_t = end_t
+            # if (ivox % 1000 == 0):
+            #     end_t = time.time()
+            #     print("{} vox: {}s".format(ivox, end_t - start_t))
+            #     start_t = end_t
         preds = preds.T
         # preds: (N_test, num_voxels)
         # train_losses, test_losses: (num_voxels, n_epochs)
