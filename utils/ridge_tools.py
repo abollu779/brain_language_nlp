@@ -207,14 +207,15 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
         test_losses[epoch] = test_loss.detach()
 
-        del Xtest
-        del Ytest
         del preds_test
         del test_loss
 
     # Generate predictions
     model.eval()
     preds_test = model(Xtest)
+    
+    del Xtest
+    del Ytest
     return preds_test, train_losses, test_losses
 
 def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, split, is_mlp_allvoxels=False):
@@ -269,14 +270,15 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach()
-
-            del Xval
-            del Yval
+            
             del preds_val
             if epoch < n_epochs - 1:
                 del val_loss
+        
         cost[idx] = val_loss.detach()
         del model
+        del Xval
+        del Yval
 
     import os
     epoch_losses_path, val_losses_path = 'mlp_allvoxels_losses/train_split{}.npy'.format(split), 'mlp_allvoxels_losses/val_split{}.npy'.format(split)
