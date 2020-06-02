@@ -154,8 +154,8 @@ def zero_unused_gradients(self, grad_in, grad_out):
     return grad_out
 
 def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, is_mlp_allvoxels=False):
-    X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
-    Xtest, Ytest = torch.from_numpy(Xtest).float().to(device), torch.from_numpy(Ytest).float().to(device)
+    X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
+    Xtest, Ytest = torch.from_numpy(Xtest).float(), torch.from_numpy(Ytest).float()
     
     model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels)
     model = model.to(device)
@@ -171,8 +171,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     test_losses = np.zeros((n_epochs,))
 
     # normalize test data
-    Xtest = torch.where(torch.isnan(Xtest), torch.zeros_like(Xtest), Xtest)
-    Ytest = torch.where(torch.isnan(Ytest), torch.zeros_like(Ytest), Ytest)
+    Xtest = torch.where(torch.isnan(Xtest), torch.zeros_like(Xtest), Xtest).to(device)
+    Ytest = torch.where(torch.isnan(Ytest), torch.zeros_like(Ytest), Ytest).to(device)
 
     for epoch in range(n_epochs):
         model.train()
@@ -185,8 +185,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
             batch_X, batch_Y = X[indices], Y[indices]
 
             # normalize batch data
-            batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X)
-            batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y)
+            batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X).to(device)
+            batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y).to(device)
 
             batch_preds = model(batch_X)
             batch_loss = criterion(batch_preds.squeeze(), batch_Y)
@@ -195,6 +195,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
             optimizer.step()
             epoch_loss += batch_loss.detach()
 
+            del batch_X
+            del batch_Y
             del batch_preds
             del batch_loss
 
@@ -202,7 +204,13 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
         model.eval()
         preds_test = model(Xtest)
         test_loss = criterion(preds_test.squeeze(), Ytest)
+
         test_losses[epoch] = test_loss.detach()
+
+        del Xtest
+        del Ytest
+        del preds_test
+        del test_loss
 
     # Generate predictions
     model.eval()
@@ -212,8 +220,12 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, split, is_mlp_allvoxels=False):
     num_lambdas = lambdas.shape[0]
 
-    X, Y = torch.from_numpy(X).float().to(device), torch.from_numpy(Y).float().to(device)
-    Xval, Yval = torch.from_numpy(Xval).float().to(device), torch.from_numpy(Yval).float().to(device)
+    X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
+    Xval, Yval = torch.from_numpy(Xval).float(), torch.from_numpy(Yval).float()
+    
+    # normalize validation data
+    Xval = torch.where(torch.isnan(Xval), torch.zeros_like(Xval), Xval).to(device)
+    Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval).to(device)
 
     cost = np.zeros((num_lambdas, ))
     epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs)), np.zeros((num_lambdas, n_epochs))
@@ -223,10 +235,6 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
         optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
         minibatch_size = model_dict['minibatch_size']
-
-        # normalize validation data
-        Xval = torch.where(torch.isnan(Xval), torch.zeros_like(Xval), Xval)
-        Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval)
 
         for epoch in range(n_epochs):
             model.train()
@@ -239,8 +247,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 batch_X, batch_Y = X[indices], Y[indices]
 
                 # normalize batch data
-                batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X)
-                batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y)
+                batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X).to(device)
+                batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y).to(device)
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
@@ -249,6 +257,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 optimizer.step()
                 epoch_loss += batch_loss.detach()
 
+                del batch_X
+                del batch_Y
                 del batch_preds
                 del batch_loss
             
@@ -259,7 +269,14 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach()
+
+            del Xval
+            del Yval
+            del preds_val
+            if epoch < n_epochs - 1:
+                del val_loss
         cost[idx] = val_loss.detach()
+        del model
 
     import os
     epoch_losses_path, val_losses_path = 'mlp_allvoxels_losses/train_split{}.npy'.format(split), 'mlp_allvoxels_losses/val_split{}.npy'.format(split)
