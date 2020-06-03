@@ -134,6 +134,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
     encoding_model = predict_feat_dict['encoding_model']
     subject = predict_feat_dict['subject']
     use_all_voxels = predict_feat_dict['use_all_voxels']
+    no_regularization = predict_feat_dict['no_regularization']
 
     word_CV_ind = TR_to_word_CV_ind(train_ind)
     train_losses, test_losses = None, None
@@ -185,7 +186,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
             train_losses = np.load(train_losses_path)
             test_losses = np.load(test_losses_path)
         else:
-            preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data)
+            preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, no_regularization=no_regularization)
             preds = preds.detach().cpu().numpy()
 
             os.makedirs(preds_dir, exist_ok=True)

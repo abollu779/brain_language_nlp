@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument("--use-all-voxels", action='store_true')
     parser.add_argument("--single-fold-computation", action='store_true')
     parser.add_argument("--fold-num", type=int, choices=[i for i in range(n_folds)])
+    parser.add_argument("--no-regularization", action='store_true')
     
     args = parser.parse_args()
 
@@ -33,23 +34,34 @@ if __name__ == '__main__':
                          'subject':args.subject,
                          'single_fold_computation': args.single_fold_computation,
                          'fold_num': args.fold_num,
-                         'use_all_voxels': args.use_all_voxels}
+                         'use_all_voxels': args.use_all_voxels,
+                         'no_regularization': args.no_regularization}
 
 
     # loading fMRI data
     data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
-    # TODO: If a model can be trained for a third of the data, ensure there's a 
-    # loop that trains models for the remaining two-thirds later
+    # # limit to ROI data
+    #     if not args.use_all_voxels:
+    #         rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
+    #         data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
     num_voxels = data.shape[1]
-    data = data[:, :num_voxels//5]
+    chunk_size = num_voxels//5
 
-    # limit to ROI data
-    if not args.use_all_voxels:
-        rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
-        data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
+    corrs_t, preds_t, test_t, train_losses_t, test_losses_t = [], [], [], [], []
 
-    corrs_t, preds_t, test_t, train_losses_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
-                                                                predict_feat_dict)
+    for data_start in range(0, num_voxels, chunk_size):
+        data = data[:, data_start:data_start+chunk_size]
+
+        corrs, preds, test, train_losses, test_losses = run_class_time_CV_fmri_crossval_ridge(data,
+                                                                    predict_feat_dict)
+        
+        corrs_t.append(corrs)
+        preds_t.append(preds)
+        test_t.append(test)
+        train_losses_t.append(train_losses)
+        test_losses_t.append(test_losses)
+        import pdb
+        pdb.set_trace()
 
     if not args.single_fold_computation:
         dirname = 'maxvoxels/' if args.use_all_voxels else 'roivoxels/'

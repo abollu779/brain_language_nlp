@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from scipy.stats import zscore
 
-from utils.global_params import n_epochs, n_splits, mlp_allvoxels_minibatch_size
+from utils.global_params import n_epochs, n_splits, mlp_allvoxels_minibatch_size, lr_when_no_regularization
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -295,36 +295,40 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     del Yval
     return cost
 
-def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, is_mlp_allvoxels=False):
+def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, is_mlp_allvoxels=False, use_regularization=True):
     import utils.utils as general_utils
     num_lambdas = lambdas.shape[0]
     r_cv = np.zeros((num_lambdas,))
 
     ind = general_utils.CV_ind(train_X.shape[0], n_folds=n_splits)
 
-    # Gather recorded costs from training with each lambda
-    for ind_num in range(n_splits):
-        if is_mlp_allvoxels:
-            start_t = time.time()
-            print("======= Split {} =======".format(ind_num))
-        trn = ind!=ind_num
-        val = ind==ind_num
+    if no_regularization:
+        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, 0, lr_when_no_regularization, is_mlp_allvoxels=is_mlp_allvoxels)
+    else:
+        # Gather recorded costs from training with each lambda
+        for ind_num in range(n_splits):
+            if is_mlp_allvoxels:
+                start_t = time.time()
+                print("======= Split {} =======".format(ind_num))
+            trn = ind!=ind_num
+            val = ind==ind_num
 
-        cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs, ind_num, is_mlp_allvoxels=is_mlp_allvoxels) # cost: (num_lambdas, )
-        r_cv += cost
-        if is_mlp_allvoxels:
-            end_t = time.time()
-            print("Time Elapsed: {}s".format(end_t - start_t))
-            print("========================")
-    # Identify optimal lambda and use it to generate predictions
-    argmin_lambda = np.argmin(r_cv)
-    opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
-    preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambda, opt_lr, is_mlp_allvoxels=is_mlp_allvoxels)
-
+            cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs, ind_num, is_mlp_allvoxels=is_mlp_allvoxels) # cost: (num_lambdas, )
+            r_cv += cost
+            if is_mlp_allvoxels:
+                end_t = time.time()
+                print("Time Elapsed: {}s".format(end_t - start_t))
+                print("========================")
+        # Identify optimal lambda and use it to generate predictions
+        argmin_lambda = np.argmin(r_cv)
+        opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
+        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambda, opt_lr, is_mlp_allvoxels=is_mlp_allvoxels)
+    
     return preds, train_losses, test_losses
 
 def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
-                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])):
+                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]),
+                        no_regularization = True):
     num_voxels = train_data.shape[1]
     feat_dim = train_features.shape[1]
     n_train, n_test = train_data.shape[0], test_data.shape[0]
@@ -351,7 +355,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         start_t = time.time()
         for ivox in range(num_voxels):
             vox_preds, vox_train_losses, vox_test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data[:, ivox],
-                                                                                        test_features, test_data[:, ivox], lambdas, lrs)
+                                                                                        test_features, test_data[:, ivox], lambdas, lrs, no_regularization=no_regularization)
             
             # Store predictions and model losses
             preds[ivox] = vox_preds.squeeze()
@@ -368,7 +372,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     else:
         # Train and predict for all voxels at once
         preds, train_losses, test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data, test_features,
-                                                                                test_data, lambdas, lrs, is_mlp_allvoxels=True)
+                                                                                test_data, lambdas, lrs, is_mlp_allvoxels=True, no_regularization=no_regularization)
         # preds: (N_test, num_voxels)
         # train_losses, test_losses: (n_epochs, )
     return preds, train_losses, test_losses
