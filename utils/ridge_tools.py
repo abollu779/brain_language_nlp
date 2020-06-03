@@ -295,7 +295,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     del Yval
     return cost
 
-def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, is_mlp_allvoxels=False, use_regularization=True):
+def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, is_mlp_allvoxels=False, no_regularization=True):
     import utils.utils as general_utils
     num_lambdas = lambdas.shape[0]
     r_cv = np.zeros((num_lambdas,))

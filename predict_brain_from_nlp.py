@@ -50,9 +50,9 @@ if __name__ == '__main__':
     corrs_t, preds_t, test_t, train_losses_t, test_losses_t = [], [], [], [], []
 
     for data_start in range(0, num_voxels, chunk_size):
-        data = data[:, data_start:data_start+chunk_size]
+        data_chunk = data[:, data_start:data_start+chunk_size]
 
-        corrs, preds, test, train_losses, test_losses = run_class_time_CV_fmri_crossval_ridge(data,
+        corrs, preds, test, train_losses, test_losses = run_class_time_CV_fmri_crossval_ridge(data_chunk,
                                                                     predict_feat_dict)
         
         corrs_t.append(corrs)

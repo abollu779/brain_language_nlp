@@ -212,23 +212,22 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
     n_voxels = data.shape[1]
 
     ind = CV_ind(n_words, n_folds=n_folds)
-
-    corrs_d = np.zeros((n_folds, n_voxels))
-    preds_d = np.zeros((n_words, n_voxels))
-    train_losses_d, test_losses_d = None, None
-    if 'mlp' in encoding_model:
-        train_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
-        test_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
-
-    all_test_data = []
     
     if single_fold_computation:
         assert 'mlp' in encoding_model
         train_ind = ind!=fold_num
         test_ind = ind==fold_num
-        corrs, preds, train_losses, test_losses, test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
+        corrs_d, preds_d, train_losses_d, test_losses_d, all_test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
                                                                                                         data, predict_feat_dict)
-    else: 
+    else:
+        corrs_d = np.zeros((n_folds, n_voxels))
+        preds_d = np.zeros((n_words, n_voxels))
+        train_losses_d, test_losses_d = None, None
+        if 'mlp' in encoding_model:
+            train_losses_d = np.zeros((n_folds, n_epochs))
+            test_losses_d = np.zeros((n_folds, n_epochs, n_voxels))
+        all_test_data = []
+
         # Train across all folds
         for ind_num in range(n_folds):
             train_ind = ind!=ind_num
