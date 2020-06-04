@@ -133,7 +133,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
     feat_dir = predict_feat_dict['nlp_feat_dir']
     encoding_model = predict_feat_dict['encoding_model']
     subject = predict_feat_dict['subject']
-    use_all_voxels = predict_feat_dict['use_all_voxels']
+    use_roi_voxels = predict_feat_dict['use_roi_voxels']
     no_regularization = predict_feat_dict['no_regularization']
 
     word_CV_ind = TR_to_word_CV_ind(train_ind)
@@ -171,7 +171,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         # weights: (40, 27905)
         del weights
     else:
-        vox_subdirname = 'maxvoxels/' if use_all_voxels else 'roivoxels/'
+        vox_subdirname = 'roivoxels/' if use_roi_voxels else 'allvoxels/'
         preds_dir = '{}/mlp_fold_preds/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
         preds_path = preds_dir + 'fold_{}.npy'.format(ind_num)
         train_losses_dir = '{}/mlp_fold_train_losses/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)

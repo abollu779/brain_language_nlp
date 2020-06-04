@@ -157,16 +157,16 @@ def zero_unused_gradients(grad):
         grad[i+1:, scol:ecol] = 0
     return grad
 
-def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, is_mlp_allvoxels=False):
+def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, is_mlp_allvoxels_separatehidden=False):
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xtest, Ytest = torch.from_numpy(Xtest).float(), torch.from_numpy(Ytest).float()
     
-    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels)
+    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels_separatehidden)
     model = model.to(device)
     criterion = nn.MSELoss(reduction='sum')
     # optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
     optimizer = optim.Adam(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
-    if is_mlp_allvoxels:
+    if is_mlp_allvoxels_separatehidden:
         # Register backward hook function for second layer's weights tensor
         model.model[2].weight.register_hook(zero_unused_gradients)
 
@@ -223,7 +223,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     del Ytest
     return preds_test, train_losses, test_losses
 
-def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, split, is_mlp_allvoxels=False):
+def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, split, is_mlp_allvoxels_separatehidden=False):
     num_lambdas = lambdas.shape[0]
 
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
@@ -236,12 +236,12 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     cost = np.zeros((num_lambdas, ))
     epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs)), np.zeros((num_lambdas, n_epochs))
     for idx,lmbda in enumerate(lambdas):
-        model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels)
+        model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
         optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
         minibatch_size = model_dict['minibatch_size']
-        if is_mlp_allvoxels:
+        if is_mlp_allvoxels_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
 
@@ -296,7 +296,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     del Yval
     return cost
 
-def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, is_mlp_allvoxels=False, no_regularization=True):
+def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, is_mlp_allvoxels_separatehidden=False, no_regularization=True):
     import utils.utils as general_utils
     num_lambdas = lambdas.shape[0]
     r_cv = np.zeros((num_lambdas,))
@@ -304,26 +304,26 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
     ind = general_utils.CV_ind(train_X.shape[0], n_folds=n_splits)
 
     if no_regularization:
-        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, 0, lr_when_no_regularization, is_mlp_allvoxels=is_mlp_allvoxels)
+        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, 0, lr_when_no_regularization, is_mlp_allvoxels_separatehidden=is_mlp_allvoxels_separatehidden)
     else:
         # Gather recorded costs from training with each lambda
         for ind_num in range(n_splits):
-            if is_mlp_allvoxels:
+            if is_mlp_allvoxels_separatehidden:
                 start_t = time.time()
                 print("======= Split {} =======".format(ind_num))
             trn = ind!=ind_num
             val = ind==ind_num
 
-            cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs, ind_num, is_mlp_allvoxels=is_mlp_allvoxels) # cost: (num_lambdas, )
+            cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs, ind_num, is_mlp_allvoxels_separatehidden=is_mlp_allvoxels_separatehidden) # cost: (num_lambdas, )
             r_cv += cost
-            if is_mlp_allvoxels:
+            if is_mlp_allvoxels_separatehidden:
                 end_t = time.time()
                 print("Time Elapsed: {}s".format(end_t - start_t))
                 print("========================")
         # Identify optimal lambda and use it to generate predictions
         argmin_lambda = np.argmin(r_cv)
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
-        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambda, opt_lr, is_mlp_allvoxels=is_mlp_allvoxels)
+        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambda, opt_lr, is_mlp_allvoxels_separatehidden=is_mlp_allvoxels_separatehidden)
     
     return preds, train_losses, test_losses
 
@@ -345,11 +345,13 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [24], 1, n_train//n_splits
     elif encoding_model == 'mlp_additionalhiddenlayer':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16,4], 1, n_train//n_splits
-    elif encoding_model == 'mlp_allvoxels':
+    elif encoding_model == 'mlp_allvoxels_separatehidden':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, allvoxels_minibatch_size
+    elif encoding_model == 'mlp_allvoxels_sharedhidden':
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, allvoxels_minibatch_size
     model_dict = dict(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
-    if encoding_model not in ['linear_sgd_allvoxels', 'mlp_allvoxels']:
+    if encoding_model not in ['linear_sgd_allvoxels', 'mlp_allvoxels_separatehidden', 'mlp_allvoxels_sharedhidden']:
         # Train and predict for one voxel at a time
         preds = torch.zeros((num_voxels, n_test))
         train_losses = np.zeros((num_voxels, n_epochs))
@@ -373,10 +375,10 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         # preds: (N_test, num_voxels)
         # train_losses, test_losses: (num_voxels, n_epochs)
     else:
-        is_mlp_allvoxels = encoding_model == 'mlp_allvoxels'
+        is_mlp_allvoxels_separatehidden = (encoding_model == 'mlp_allvoxels_separatehidden')
         # Train and predict for all voxels at once
         preds, train_losses, test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data, test_features,
-                                                                                test_data, lambdas, lrs, is_mlp_allvoxels=is_mlp_allvoxels, no_regularization=no_regularization)
+                                                                                test_data, lambdas, lrs, is_mlp_allvoxels_separatehidden=is_mlp_allvoxels_separatehidden, no_regularization=no_regularization)
         # preds: (N_test, num_voxels)
         # train_losses, test_losses: (n_epochs, )
     return preds, train_losses, test_losses

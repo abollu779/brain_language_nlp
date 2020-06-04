@@ -14,7 +14,7 @@ if __name__ == '__main__':
     parser.add_argument("--sequence-length", type=int, required=False)
     parser.add_argument("--encoding-model", default='linear', choices=encoding_model_options)
     parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--use-all-voxels", action='store_true')
+    parser.add_argument("--use-roi-voxels", action='store_true')
     parser.add_argument("--single-fold-computation", action='store_true')
     parser.add_argument("--fold-num", type=int, choices=[i for i in range(n_folds)])
     parser.add_argument("--no-regularization", action='store_true')
@@ -34,14 +34,14 @@ if __name__ == '__main__':
                          'subject':args.subject,
                          'single_fold_computation': args.single_fold_computation,
                          'fold_num': args.fold_num,
-                         'use_all_voxels': args.use_all_voxels,
+                         'use_roi_voxels': args.use_roi_voxels,
                          'no_regularization': args.no_regularization}
 
 
     # loading fMRI data
     data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
     # # limit to ROI data
-    #     if not args.use_all_voxels:
+    #     if args.use_roi_voxels:
     #         rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
     #         data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
     num_voxels = data.shape[1]
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
 
     if not args.single_fold_computation:
-        dirname = 'maxvoxels/' if args.use_all_voxels else 'roivoxels/'
+        dirname = 'roivoxels/' if args.use_roi_voxels else 'maxvoxels/'
         fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model)
         print('saving: {}'.format(args.output_dir + dirname + fname))
 
