@@ -12,8 +12,7 @@ class MLPEncodingModel(nn.Module):
                         nn.Linear(hidden_sizes[0], hidden_sizes[1]),
                         nn.ReLU(),
                         nn.Linear(hidden_sizes[1], output_size))
-        else:
-            assert len(hidden_sizes) == 1
+        elif len(hidden_sizes) == 1:
             self.model = nn.Sequential(nn.Linear(input_size, hidden_sizes[0]), 
                         nn.ReLU(), 
                         nn.Linear(hidden_sizes[0], output_size))
@@ -28,6 +27,10 @@ class MLPEncodingModel(nn.Module):
                     ecol = scol + 16
                     linear2_weights[:i, scol:ecol] = 0
                     linear2_weights[i+1:, scol:ecol] = 0
+        else:
+            assert len(hidden_sizes) == 0
+            self.model = nn.Sequential(nn.Linear(input_size, output_size))
+
 
     def forward(self, features):
         outputs = self.model(features)

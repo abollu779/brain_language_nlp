@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from scipy.stats import zscore
 
-from utils.global_params import n_epochs, n_splits, mlp_allvoxels_minibatch_size, lr_when_no_regularization
+from utils.global_params import n_epochs, n_splits, allvoxels_minibatch_size, lr_when_no_regularization
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -335,6 +335,8 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     n_train, n_test = train_data.shape[0], test_data.shape[0]
 
     # Initialize appropriate encoding model
+    if encoding_model == 'linear_sgd_allvoxels':
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [], num_voxels, allvoxels_minibatch_size
     if encoding_model == 'mlp_initial':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16], 1, n_train//n_splits
     elif encoding_model == 'mlp_smallerhiddensize':
@@ -344,10 +346,10 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     elif encoding_model == 'mlp_additionalhiddenlayer':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16,4], 1, n_train//n_splits
     elif encoding_model == 'mlp_allvoxels':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, mlp_allvoxels_minibatch_size
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, allvoxels_minibatch_size
     model_dict = dict(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
-    if encoding_model != 'mlp_allvoxels':
+    if encoding_model not in ['linear_sgd_allvoxels', 'mlp_allvoxels']:
         # Train and predict for one voxel at a time
         preds = torch.zeros((num_voxels, n_test))
         train_losses = np.zeros((num_voxels, n_epochs))
@@ -371,9 +373,10 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         # preds: (N_test, num_voxels)
         # train_losses, test_losses: (num_voxels, n_epochs)
     else:
+        is_mlp_allvoxels = encoding_model == 'mlp_allvoxels'
         # Train and predict for all voxels at once
         preds, train_losses, test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data, test_features,
-                                                                                test_data, lambdas, lrs, is_mlp_allvoxels=True, no_regularization=no_regularization)
+                                                                                test_data, lambdas, lrs, is_mlp_allvoxels=is_mlp_allvoxels, no_regularization=no_regularization)
         # preds: (N_test, num_voxels)
         # train_losses, test_losses: (n_epochs, )
     return preds, train_losses, test_losses
