@@ -63,7 +63,7 @@ if __name__ == '__main__':
             train_losses_t.append(train_losses)
             test_losses_t.append(test_losses)
         
-        corrs_t = np.concatenate(corrs_t, axis=0)
+        corrs_t = np.concatenate(corrs_t, axis=1)
         preds_t = np.concatenate(preds_t, axis=1)
         test_t = np.concatenate(test_t, axis=1)
         train_losses_t = np.stack(train_losses_t, axis=0)
