@@ -166,6 +166,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     criterion = nn.MSELoss(reduction='sum')
     # optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
     optimizer = optim.Adam(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=1)
     if is_mlp_allvoxels_separatehidden:
         # Register backward hook function for second layer's weights tensor
         model.model[2].weight.register_hook(zero_unused_gradients)
@@ -209,11 +210,11 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
         model.eval()
         preds_test = model(Xtest)
         test_loss = criterion(preds_test.squeeze(), Ytest)
+        scheduler.step(test_loss)
 
         test_losses[epoch] = test_loss.detach()
 
         del preds_test
-        del test_loss
 
     # Generate predictions
     model.eval()
@@ -240,6 +241,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         model = model.to(device)
         criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
         optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=1)
         minibatch_size = model_dict['minibatch_size']
         if is_mlp_allvoxels_separatehidden:
             # Register backward hook function for second layer's weights tensor
@@ -275,13 +277,12 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             model.eval()
             preds_val = model(Xval)
             val_loss = criterion(preds_val.squeeze(), Yval)
+            scheduler.step(val_loss)
 
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach()
             
             del preds_val
-            if epoch < n_epochs - 1:
-                del val_loss
         
         cost[idx] = val_loss.detach()
         del model
@@ -320,15 +321,17 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
                 end_t = time.time()
                 print("Time Elapsed: {}s".format(end_t - start_t))
                 print("========================")
+        import pdb
+        pdb.set_trace()
         # Identify optimal lambda and use it to generate predictions
         argmin_lambda = np.argmin(r_cv)
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
         preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambda, opt_lr, is_mlp_allvoxels_separatehidden=is_mlp_allvoxels_separatehidden)
-    
+    pdb.set_trace()
     return preds, train_losses, test_losses
 
 def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
-                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]),
+                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*9+[1e-3]*8),
                         no_regularization = True):
     num_voxels = train_data.shape[1]
     feat_dim = train_features.shape[1]
