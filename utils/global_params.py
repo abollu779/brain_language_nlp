@@ -9,6 +9,7 @@ n_epochs = 15
 encoding_model_options = ['linear', 'linear_sgd_allvoxels', 'mlp_allvoxels_separatehidden', 'mlp_allvoxels_sharedhidden', 'mlp_initial', 'mlp_smallerhiddensize', 'mlp_largerhiddensize', 'mlp_additionalhiddenlayer']
 n_splits = 10 # When training on each fold, train data is further split up into n_splits to compute model costs and pick an optimal lambda during ridge regression
 lr_when_no_regularization = 1e-4
+epoch_change_lr = 7
 
 # allvoxels specific params
 allvoxels_minibatch_size = 32
