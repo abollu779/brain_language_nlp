@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from scipy.stats import zscore
 
-from utils.global_params import n_epochs, n_splits, allvoxels_minibatch_size, lr_when_no_regularization, epoch_change_lr
+from utils.global_params import n_epochs, n_splits, allvoxels_minibatch_size, lr_when_no_regularization
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -163,10 +163,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     
     model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels_separatehidden)
     model = model.to(device)
-    criterion = nn.MSELoss(reduction='mean')
+    criterion = nn.MSELoss(reduction='sum')
+    # optimizer = optim.SGD(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
     optimizer = optim.Adam(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
-    lr_lambda = lambda epoch: 0.1 if epoch > epoch_change_lr else 1
-    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=1)
     if is_mlp_allvoxels_separatehidden:
         # Register backward hook function for second layer's weights tensor
         model.model[2].weight.register_hook(zero_unused_gradients)
@@ -181,8 +181,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
     Ytest = torch.where(torch.isnan(Ytest), torch.zeros_like(Ytest), Ytest).to(device)
 
     for epoch in range(n_epochs):
-        for param_group in optimizer.param_groups:
-            print("Epoch: {}, LR: {}".format(epoch, param_group['lr']))
         model.train()
         permutation = torch.randperm(X.shape[0])
         epoch_loss = 0
@@ -218,8 +216,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
         del preds_test
 
-    import pdb
-    pdb.set_trace()
     # Generate predictions
     model.eval()
     preds_test = model(Xtest)
@@ -243,18 +239,15 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     for idx,lmbda in enumerate(lambdas):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_allvoxels_separatehidden)
         model = model.to(device)
-        criterion = nn.MSELoss(reduction='mean') # sum of squared errors (instead of mean)
-        optimizer = optim.Adam(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
-        lr_lambda = lambda epoch: 0.1 if epoch > epoch_change_lr else 1
-        scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
+        criterion = nn.MSELoss(reduction='sum') # sum of squared errors (instead of mean)
+        optimizer = optim.SGD(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=1)
         minibatch_size = model_dict['minibatch_size']
         if is_mlp_allvoxels_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
 
         for epoch in range(n_epochs):
-            for param_group in optimizer.param_groups:
-                print("Weight Decay: {}, Epoch: {}, LR: {}".format(lmbda, epoch, param_group['lr']))
             model.train()
             permutation = torch.randperm(X.shape[0])
             epoch_loss = 0
@@ -338,7 +331,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
     return preds, train_losses, test_losses
 
 def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
-                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*9+[1e-3]*7),
+                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*9+[1e-3]*8),
                         no_regularization = True):
     num_voxels = train_data.shape[1]
     feat_dim = train_features.shape[1]
