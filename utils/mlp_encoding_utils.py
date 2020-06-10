@@ -28,6 +28,7 @@ class MLPEncodingModel(nn.Module):
                     linear2_weights[:i, scol:ecol] = 0
                     linear2_weights[i+1:, scol:ecol] = 0
         else:
+            # Training a linear probe
             assert len(hidden_sizes) == 0
             self.model = nn.Sequential(nn.Linear(input_size, output_size))
 

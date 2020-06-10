@@ -210,7 +210,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
             del batch_preds
             del batch_loss
         
-        train_losses[epoch] = epoch_loss
         model.eval()
         preds_test = model(Xtest)
         test_loss = criterion(preds_test.squeeze(), Ytest)
@@ -221,6 +220,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda,
 
         # Overwrite checkpoint
         torch.save(model.state_dict(), checkpoint_path)
+        train_losses[epoch] = epoch_loss
         test_losses[epoch] = test_loss.detach()
 
     # Load checkpoint from previous epoch
@@ -336,8 +336,8 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         argmin_lambda = np.argmin(r_cv)
         opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
         preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambda, opt_lr, is_mlp_allvoxels_separatehidden=is_mlp_allvoxels_separatehidden)
-    import pdb
-    pdb.set_trace()
+    # import pdb
+    # pdb.set_trace()
     return preds, train_losses, test_losses
 
 def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
