@@ -296,7 +296,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             # Validation loss for current epoch
             model.eval()
             preds_val = model(Xval)
-            val_loss = criterion_val(preds_val.squeeze(), Yval).sum(dim=0)
+            val_loss = criterion_val(preds_val.squeeze(), Yval).mean(dim=0)
             del preds_val
 
             epoch_losses[idx, epoch] = epoch_loss
