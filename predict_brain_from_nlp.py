@@ -45,7 +45,7 @@ if __name__ == '__main__':
         rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
         data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
 
-    if args.encoding_model == 'mlp_allvoxels_separatehidden':
+    if args.encoding_model == 'mlp_separatehidden':
         num_voxels = data.shape[1]
         chunk_size = num_voxels//5
 
@@ -75,7 +75,8 @@ if __name__ == '__main__':
 
     if not args.single_fold_computation:
         dirname = 'roivoxels/' if args.use_roi_voxels else 'maxvoxels/'
-        fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model)
+        regularization_suffix = 'noreg' if args.no_regularization else 'reg'
+        fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model, regularization_suffix)
         print('saving: {}'.format(args.output_dir + dirname + fname))
 
         os.makedirs(args.output_dir + dirname, exist_ok=True)

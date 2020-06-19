@@ -166,7 +166,8 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
         test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
         
-        weights, chosen_lambdas = cross_val_ridge(train_features, train_data, method='plain', do_plot=False)
+        weights, chosen_lambdas = cross_val_ridge(train_features, train_data, method='plain', do_plot=False, no_regularization=no_regularization)
+        np.save('linear_lambdas/linear/subject{}_layer{}_seqlen{}_fold{}.npy'.format(subject, layer, seq_len, ind_num), chosen_lambdas)
         preds =  np.dot(test_features, weights)
         # weights: (40, 27905)
         del weights
@@ -218,11 +219,11 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
         preds_d = np.zeros((n_words, n_voxels))
         train_losses_d, test_losses_d = None, None
         if encoding_model != 'linear':
-            if encoding_model in ['linear_sgd_allvoxels', 'mlp_allvoxels_separatehidden', 'mlp_allvoxels_sharedhidden']:
+            if encoding_model in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden']:
                 train_losses_d = np.zeros((n_folds, n_epochs))
                 test_losses_d = np.zeros((n_folds, n_epochs))
             else:
-                assert encoding_model in ['mlp_initial', 'mlp_smallerhiddensize', 'mlp_largerhiddensize', 'mlp_additionalhiddenlayer']
+                assert encoding_model in ['mlp_forloop', 'mlp_smallerhiddensize', 'mlp_largerhiddensize', 'mlp_additionalhiddenlayer']
                 train_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
                 test_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
         all_test_data = []
