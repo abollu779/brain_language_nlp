@@ -167,81 +167,92 @@ def zero_unused_gradients(grad):
         grad[i+1:, scol:ecol] = 0
     return grad
 
-def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lmbda, opt_lr, is_mlp_separatehidden=False):
+def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambdas, opt_lrs, is_mlp_separatehidden=False):
+    import pdb
+    pdb.set_trace()
+    opt_lambdas_lrs = np.array(list(zip(opt_lambdas, opt_lrs)))
+    unique_lambdas_lrs = np.unique(opt_lambdas_lrs, axis=0)
+    num_lambdas = unique_lambdas_lrs.shape[0]
+    num_voxels = 1 if (len(Y.shape) == 1) else Y.shape[1]
+
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xtest, Ytest = torch.from_numpy(Xtest).float(), torch.from_numpy(Ytest).float()
-    
-    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
-    model = model.to(device)
-    criterion = nn.MSELoss(reduction='mean')
-    optimizer = optim.Adam(model.parameters(), lr=opt_lr, weight_decay=opt_lmbda)
-    if is_mlp_separatehidden:
-        # Register backward hook function for second layer's weights tensor
-        model.model[2].weight.register_hook(zero_unused_gradients)
 
-    # Train model with min_lmbda
     minibatch_size = model_dict['minibatch_size']
-    train_losses = np.zeros((n_epochs,))
-    test_losses = np.zeros((n_epochs,))
+    train_losses = np.zeros((num_lambdas, n_epochs))
+    test_losses = np.zeros((n_epochs, num_voxels))
+    final_preds = np.zeros_like(Ytest)
 
     # normalize test data
     Xtest = torch.where(torch.isnan(Xtest), torch.zeros_like(Xtest), Xtest).to(device)
     Ytest = torch.where(torch.isnan(Ytest), torch.zeros_like(Ytest), Ytest).to(device)
 
-    # Model checkpoint path
-    if not os.path.exists(model_checkpoint_dir):
-        os.makedirs(model_checkpoint_dir)
-    checkpoint_path = model_checkpoint_dir + 'checkpoint.pt'
+    for idx, (lmbda, lr) in enumerate(unique_lambdas_lrs):
+        model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
+        model = model.to(device)
+        criterion = nn.MSELoss(reduction='mean')
+        criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=lmbda)
+        if is_mlp_separatehidden:
+            # Register backward hook function for second layer's weights tensor
+            model.model[2].weight.register_hook(zero_unused_gradients)
+
+        # # Model checkpoint path
+        # if not os.path.exists(model_checkpoint_dir):
+        #     os.makedirs(model_checkpoint_dir)
+        # checkpoint_path = model_checkpoint_dir + 'checkpoint.pt'
     
-    for epoch in range(n_epochs):
-        model.train()
-        permutation = torch.randperm(X.shape[0])
-        epoch_loss = 0
-        for i in range(0, X.shape[0], minibatch_size):
-            optimizer.zero_grad()
+        current_voxels = opt_lambdas == lmbda
+        for epoch in range(n_epochs):
+            model.train()
+            permutation = torch.randperm(X.shape[0])
+            epoch_loss = 0
+            for i in range(0, X.shape[0], minibatch_size):
+                optimizer.zero_grad()
 
-            indices = permutation[i:i+minibatch_size]
-            batch_X, batch_Y = X[indices], Y[indices]
+                indices = permutation[i:i+minibatch_size]
+                batch_X, batch_Y = X[indices], Y[indices]
 
-            # normalize batch data
-            batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X).to(device)
-            batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y).to(device)
+                # normalize batch data
+                batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X).to(device)
+                batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y).to(device)
 
-            batch_preds = model(batch_X)
-            batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+                batch_preds = model(batch_X)
+                batch_loss = criterion(batch_preds.squeeze(), batch_Y)
 
-            batch_loss.backward()
-            optimizer.step()
-            epoch_loss += batch_loss.detach()
+                batch_loss.backward()
+                optimizer.step()
+                epoch_loss += batch_loss.detach()
 
-            del batch_X
-            del batch_Y
-            del batch_preds
-            del batch_loss
+                del batch_X
+                del batch_Y
+                del batch_preds
+                del batch_loss
         
+            model.eval()
+            preds_test = model(Xtest)
+            test_loss = criterion_test(preds_test.squeeze(), Ytest).mean(dim=0)
+            del preds_test
+
+            # # Overwrite checkpoint
+            # torch.save(model.state_dict(), checkpoint_path)
+            train_losses[idx, epoch] = epoch_loss
+            test_losses[epoch][current_voxels] = test_loss.detach()
+
+        # Load checkpoint from previous epoch
+        # model.load_state_dict(torch.load(checkpoint_path))
+
+        pdb.set_trace()
+    
+        # Generate predictions
         model.eval()
         preds_test = model(Xtest)
-        test_loss = criterion(preds_test.squeeze(), Ytest)
-        del preds_test
+        final_preds = preds_test[:, current_voxels]
 
-        if epoch > 0 and test_loss.detach() > test_losses[epoch-1]:
-            break
-
-        # Overwrite checkpoint
-        torch.save(model.state_dict(), checkpoint_path)
-        train_losses[epoch] = epoch_loss
-        test_losses[epoch] = test_loss.detach()
-
-    # Load checkpoint from previous epoch
-    model.load_state_dict(torch.load(checkpoint_path))
-    
-    # Generate predictions
-    model.eval()
-    preds_test = model(Xtest)
-
+    pdb.set_trace()
     del Xtest
     del Ytest
-    return preds_test, train_losses, test_losses
+    return final_preds, train_losses, test_losses
 
 def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, split, is_mlp_separatehidden=False):
     num_lambdas = lambdas.shape[0]
@@ -255,14 +266,14 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval).to(device)
 
     epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs)), np.zeros((num_lambdas, n_epochs, num_voxels))
+    minibatch_size = model_dict['minibatch_size']
     
     for idx,lmbda in enumerate(lambdas):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
-        criterion = nn.MSELoss(reduction='mean') # sum of squared errors (instead of mean)
+        criterion = nn.MSELoss(reduction='mean')
         criterion_val = nn.MSELoss(reduction='none') # store val squared errors for every voxel
         optimizer = optim.Adam(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
-        minibatch_size = model_dict['minibatch_size']
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
@@ -343,10 +354,8 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
                 print("========================")
         # Identify optimal lambda and use it to generate predictions
         argmin_lambda = np.argmin(r_cv, axis=0)
-        import pdb
-        pdb.set_trace()
-        opt_lambda, opt_lr = lambdas[argmin_lambda], lrs[argmin_lambda]
-        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambda, opt_lr, is_mlp_separatehidden=is_mlp_separatehidden)
+        opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
+        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, is_mlp_separatehidden=is_mlp_separatehidden)
     return preds, train_losses, test_losses
 
 def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
