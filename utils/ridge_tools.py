@@ -169,7 +169,6 @@ def zero_unused_gradients(grad):
 
 def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambdas, opt_lrs, is_mlp_separatehidden=False):
     import pdb
-    pdb.set_trace()
     opt_lambdas_lrs = np.array(list(zip(opt_lambdas, opt_lrs)))
     unique_lambdas_lrs = np.unique(opt_lambdas_lrs, axis=0)
     num_lambdas = unique_lambdas_lrs.shape[0]
@@ -181,7 +180,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     minibatch_size = model_dict['minibatch_size']
     train_losses = np.zeros((num_lambdas, n_epochs))
     test_losses = np.zeros((n_epochs, num_voxels))
-    final_preds = np.zeros_like(Ytest)
+    final_preds = torch.zeros_like(Ytest).to(device)
 
     # normalize test data
     Xtest = torch.where(torch.isnan(Xtest), torch.zeros_like(Xtest), Xtest).to(device)
@@ -237,7 +236,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             # # Overwrite checkpoint
             # torch.save(model.state_dict(), checkpoint_path)
             train_losses[idx, epoch] = epoch_loss
-            test_losses[epoch][current_voxels] = test_loss.detach()
+            test_losses[epoch][current_voxels] = test_loss[current_voxels].detach().cpu()
 
         # Load checkpoint from previous epoch
         # model.load_state_dict(torch.load(checkpoint_path))
@@ -247,7 +246,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         # Generate predictions
         model.eval()
         preds_test = model(Xtest)
-        final_preds = preds_test[:, current_voxels]
+        final_preds[:, current_voxels] = preds_test[:, current_voxels]
 
     pdb.set_trace()
     del Xtest
