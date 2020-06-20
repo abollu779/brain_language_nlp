@@ -219,13 +219,8 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
         preds_d = np.zeros((n_words, n_voxels))
         train_losses_d, test_losses_d = None, None
         if encoding_model != 'linear':
-            if encoding_model in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden']:
-                train_losses_d = np.zeros((n_folds, n_epochs))
-                test_losses_d = np.zeros((n_folds, n_epochs))
-            else:
-                assert encoding_model in ['mlp_forloop', 'mlp_smallerhiddensize', 'mlp_largerhiddensize', 'mlp_additionalhiddenlayer']
-                train_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
-                test_losses_d = np.zeros((n_folds, n_voxels, n_epochs))
+            train_losses_d = {}
+            test_losses_d = {}
         all_test_data = []
 
         # Train across all folds
@@ -239,8 +234,8 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
             preds_d[test_ind] = preds
 
             if encoding_model != 'linear':
-                train_losses_d[ind_num,:] = train_losses
-                test_losses_d[ind_num,:] = test_losses
+                train_losses_d[ind_num] = train_losses
+                test_losses_d[ind_num] = test_losses
             
         all_test_data = np.vstack(all_test_data)
 

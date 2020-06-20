@@ -240,8 +240,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
 
         # Load checkpoint from previous epoch
         # model.load_state_dict(torch.load(checkpoint_path))
-
-        pdb.set_trace()
     
         # Generate predictions
         model.eval()
