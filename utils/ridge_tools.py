@@ -333,7 +333,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
     ind = general_utils.CV_ind(train_X.shape[0], n_folds=n_splits)
 
     if no_regularization:
-        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, 0, lr_when_no_regularization, is_mlp_separatehidden=is_mlp_separatehidden)
+        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, np.array([0.]), np.array([lr_when_no_regularization]), is_mlp_separatehidden=is_mlp_separatehidden)
     else:
         # Gather recorded costs from training with each lambda
         for ind_num in range(n_splits):
