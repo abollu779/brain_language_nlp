@@ -191,7 +191,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
-        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=lmbda)
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=2*lmbda)
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
@@ -262,7 +262,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     Xval = torch.where(torch.isnan(Xval), torch.zeros_like(Xval), Xval).to(device)
     Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval).to(device)
 
-    epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs)), np.zeros((num_lambdas, n_epochs, num_voxels))
+    epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs, num_voxels)), np.zeros((num_lambdas, n_epochs, num_voxels))
     minibatch_size = model_dict['minibatch_size']
     
     for idx,lmbda in enumerate(lambdas):
@@ -270,10 +270,12 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         criterion_val = nn.MSELoss(reduction='none') # store val squared errors for every voxel
-        optimizer = optim.Adam(model.parameters(), lr=lrs[idx], weight_decay=lmbda) # adds ridge penalty to above SSE criterion
+        optimizer = optim.Adam(model.parameters(), lr=lrs[idx], weight_decay=2*lmbda) # adds ridge penalty to above SSE criterion
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
+        
+        num_batches = X.shape[0]//minibatch_size
 
         for epoch in range(n_epochs):
             model.train()
@@ -307,12 +309,13 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             val_loss = criterion_val(preds_val.squeeze(), Yval).mean(dim=0)
             del preds_val
 
+            epoch_loss /= num_batches
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach().cpu()
 
         del model
 
-    cost = val_losses.min(axis=1) # (num_lambdas, num_voxels)
+    cost = val_losses[:,-1,:] # (num_lambdas, num_voxels)
 
     import os
     epoch_losses_path, val_losses_path = 'mlp_losses/train_split{}.npy'.format(split), 'mlp_losses/val_split{}.npy'.format(split)
@@ -330,18 +333,16 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
     num_voxels = 1 if (len(train_Y.shape) == 1) else train_Y.shape[1]
     r_cv = np.zeros((num_lambdas, num_voxels))
 
-    ind = general_utils.CV_ind(train_X.shape[0], n_folds=n_splits)
 
     if no_regularization:
-        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, np.array([0.]), np.array([lr_when_no_regularization]), is_mlp_separatehidden=is_mlp_separatehidden)
+        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, np.array([0.] * num_voxels), np.array([lr_when_no_regularization] * num_voxels), is_mlp_separatehidden=is_mlp_separatehidden)
     else:
+        kf = KFold(n_splits=n_splits)
         # Gather recorded costs from training with each lambda
-        for ind_num in range(n_splits):
+        for ind_num, (trn, val) in enumerate(kf.split(train_Y)):
             if is_mlp_separatehidden:
                 start_t = time.time()
                 print("======= Split {} =======".format(ind_num))
-            trn = ind!=ind_num
-            val = ind==ind_num
 
             cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs, ind_num, is_mlp_separatehidden=is_mlp_separatehidden) # cost: (num_lambdas, )
             r_cv += cost
