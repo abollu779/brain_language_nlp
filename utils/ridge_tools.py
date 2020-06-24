@@ -145,8 +145,6 @@ def cross_val_ridge(train_features,train_data,
             plt.imshow(r_cv,aspect='auto',cmap = 'RdBu_r');
 
         argmin_lambda = np.argmin(r_cv,axis = 0)
-        import pdb
-        pdb.set_trace()
         weights = np.zeros((train_features.shape[1],train_data.shape[1]))
         for idx_lambda in range(lambdas.shape[0]): # this is much faster than iterating over voxels!
             idx_vox = argmin_lambda == idx_lambda
@@ -178,6 +176,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     Xtest, Ytest = torch.from_numpy(Xtest).float(), torch.from_numpy(Ytest).float()
 
     minibatch_size = model_dict['minibatch_size']
+    num_batches = X.shape[0]//minibatch_size
     train_losses = np.zeros((num_lambdas, n_epochs))
     test_losses = np.zeros((n_epochs, num_voxels))
     final_preds = torch.zeros_like(Ytest).to(device)
@@ -191,7 +190,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
-        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=2*lmbda)
+        optimizer = optim.Adam(model.parameters(), lr=lr)
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
@@ -218,10 +217,15 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+                weights_squared_sum = 0.
+                for layer in model.model:
+                    if isinstance(layer, nn.Linear):
+                        weights_squared_sum += ((layer.weight)**2).sum()
+                batch_loss += (float(minibatch_size)/X.shape[0]) * lmbda * weights_squared_sum
 
                 batch_loss.backward()
                 optimizer.step()
-                epoch_loss += batch_loss.detach()
+                epoch_loss += batch_loss.detach().cpu()
 
                 del batch_X
                 del batch_Y
@@ -235,6 +239,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
 
             # # Overwrite checkpoint
             # torch.save(model.state_dict(), checkpoint_path)
+            epoch_loss /= num_batches
             train_losses[idx, epoch] = epoch_loss
             test_losses[epoch][current_voxels] = test_loss[current_voxels].detach().cpu()
 
@@ -246,7 +251,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         preds_test = model(Xtest)
         final_preds[:, current_voxels] = preds_test[:, current_voxels]
 
-    pdb.set_trace()
+    # pdb.set_trace()
     del Xtest
     del Ytest
     return final_preds, train_losses, test_losses
@@ -262,25 +267,24 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     Xval = torch.where(torch.isnan(Xval), torch.zeros_like(Xval), Xval).to(device)
     Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval).to(device)
 
-    epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs, num_voxels)), np.zeros((num_lambdas, n_epochs, num_voxels))
+    epoch_losses, val_losses = np.zeros((num_lambdas, n_epochs)), np.zeros((num_lambdas, n_epochs, num_voxels))
     minibatch_size = model_dict['minibatch_size']
+    num_batches = X.shape[0]//minibatch_size
     
     for idx,lmbda in enumerate(lambdas):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         criterion_val = nn.MSELoss(reduction='none') # store val squared errors for every voxel
-        optimizer = optim.Adam(model.parameters(), lr=lrs[idx], weight_decay=2*lmbda) # adds ridge penalty to above SSE criterion
+        optimizer = optim.Adam(model.parameters(), lr=lrs[idx])
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
         
-        num_batches = X.shape[0]//minibatch_size
-
         for epoch in range(n_epochs):
             model.train()
             permutation = torch.randperm(X.shape[0])
-            epoch_loss = 0
+            epoch_loss = 0.
             for i in range(0, X.shape[0], minibatch_size):
                 optimizer.zero_grad()
 
@@ -293,10 +297,15 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+                weights_squared_sum = 0.
+                for layer in model.model:
+                    if isinstance(layer, nn.Linear):
+                        weights_squared_sum += ((layer.weight)**2).sum()
+                batch_loss += (float(minibatch_size)/X.shape[0]) * lmbda * weights_squared_sum
 
                 batch_loss.backward()
                 optimizer.step()
-                epoch_loss += batch_loss.detach()
+                epoch_loss += batch_loss.detach().cpu()
 
                 del batch_X
                 del batch_Y
@@ -307,11 +316,13 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             model.eval()
             preds_val = model(Xval)
             val_loss = criterion_val(preds_val.squeeze(), Yval).mean(dim=0)
-            del preds_val
 
             epoch_loss /= num_batches
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach().cpu()
+
+            del preds_val
+            del val_loss
 
         del model
 
@@ -357,7 +368,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
     return preds, train_losses, test_losses
 
 def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
-                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-4]*9+[1e-3]*8),
+                        lambdas = np.array([10**i for i in range(-6,10)]), lrs = np.array([1e-3]*16),
                         no_regularization = True):
     num_voxels = train_data.shape[1]
     feat_dim = train_features.shape[1]
