@@ -9,7 +9,7 @@ import nibabel
 from sklearn.metrics.pairwise import euclidean_distances
 from scipy.ndimage.filters import gaussian_filter
 
-from utils.global_params import n_folds, n_epochs, n_splits
+from utils.global_params import n_folds, n_splits, sgd_noreg_lrs, sgd_reg_lrs
 from utils.ridge_tools import cross_val_ridge, corr, cross_val_ridge_mlp
 import time as tm
 
@@ -181,7 +181,11 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         test_losses_path = test_losses_dir + 'fold_{}.npy'.format(ind_num)
 
         s_t = tm.time()
-        preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, no_regularization=no_regularization)
+        if no_regularization:
+            lrs = sgd_noreg_lrs[encoding_model]
+        else:
+            lrs = sgd_reg_lrs[encoding_model]
+        preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, lrs=lrs, no_regularization=no_regularization)
         preds = preds.detach().cpu().numpy()
 
         os.makedirs(preds_dir, exist_ok=True)
