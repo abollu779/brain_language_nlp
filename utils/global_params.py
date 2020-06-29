@@ -25,6 +25,8 @@ sgd_noreg_n_epochs = {'linear_sgd': 27,
 
 # With Regularization
 sgd_reg_lrs = {'linear_sgd': np.array([1e-3]*16),
-                'mlp_sharedhidden': np.array([1e-2]*2 + [1e-3]*14)}
+                'mlp_sharedhidden': np.array([1e-2]*2 + [1e-3]*14),
+                'mlp_separatehidden': np.array([1e-5]*16)}
 sgd_reg_n_epochs = {'linear_sgd': np.array([27]*16),
-                    'mlp_sharedhidden': np.array([40]*16)}
+                    'mlp_sharedhidden': np.array([40]*16),
+                    'mlp_separatehidden': np.array([20]*16)}

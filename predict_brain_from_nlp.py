@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     if args.encoding_model == 'mlp_separatehidden':
         num_voxels = data.shape[1]
-        chunk_size = num_voxels//5
+        chunk_size = num_voxels//6
 
         corrs_t, preds_t, test_t, train_losses_t, test_losses_t = [], [], [], [], []
 
