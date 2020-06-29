@@ -247,7 +247,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             # torch.save(model.state_dict(), checkpoint_path)
             epoch_loss /= num_batches
             train_losses[idx, epoch] = epoch_loss
-            test_losses[epoch][current_voxels] = test_loss[current_voxels].detach().cpu()
+            if len(test_loss.shape) == 0:
+              test_losses[epoch][current_voxels] = test_loss.detach().cpu()
+            else:
+              test_losses[epoch][current_voxels] = test_loss[current_voxels].detach().cpu()
 
         # Load checkpoint from previous epoch
         # model.load_state_dict(torch.load(checkpoint_path))
@@ -255,7 +258,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         # Generate predictions
         model.eval()
         preds_test = model(Xtest)
-        final_preds[:, current_voxels] = preds_test[:, current_voxels]
+        if len(final_preds.shape) == 1:
+            final_preds = preds_test
+        else:
+            final_preds[:, current_voxels] = preds_test[:, current_voxels]
 
     # pdb.set_trace()
     del Xtest
