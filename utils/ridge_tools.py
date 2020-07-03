@@ -148,6 +148,8 @@ def cross_val_ridge(train_features,train_data,
             plt.figure()
             plt.imshow(r_cv,aspect='auto',cmap = 'RdBu_r');
 
+        import pdb
+        pdb.set_trace()
         argmin_lambda = np.argmin(r_cv,axis = 0)
         weights = np.zeros((train_features.shape[1],train_data.shape[1]))
         for idx_lambda in range(lambdas.shape[0]): # this is much faster than iterating over voxels!
@@ -159,6 +161,13 @@ def cross_val_ridge(train_features,train_data,
         min_lambdas = np.array([lambdas[i] for i in argmin_lambda])
 
     return weights, min_lambdas
+
+def R2_torch(Pred,Real):
+    SSres = torch.mean((Real-Pred)**2,0)
+    SStot = torch.var(Real,0)
+    output = 1-SSres/SStot
+    output[torch.isnan(output)] = 0. # torch doesn't provide a nan_to_num equivalent
+    return output
 
 def zero_unused_gradients(grad):
     num_voxels = grad.shape[0]
@@ -288,7 +297,6 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
-        criterion_val = nn.MSELoss(reduction='none') # store val squared errors for every voxel
         optimizer = optim.Adam(model.parameters(), lr=lrs[idx])
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
@@ -329,7 +337,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             # Validation loss for current epoch
             model.eval()
             preds_val = model(Xval)
-            val_loss = criterion_val(preds_val.squeeze(), Yval).mean(dim=0)
+            val_loss = 1 - R2_torch(preds_val.squeeze(), Yval)
 
             epoch_loss /= num_batches
             epoch_losses[idx, epoch] = epoch_loss
@@ -376,6 +384,8 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
                 print("Time Elapsed: {}s".format(end_t - start_t))
                 print("========================")
         # Identify optimal lambda and use it to generate predictions
+        import pdb
+        pdb.set_trace()
         argmin_lambda = np.argmin(r_cv, axis=0)
         plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
         plt.xlim(0, 15)

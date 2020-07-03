@@ -167,7 +167,6 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
         
         weights, chosen_lambdas = cross_val_ridge(train_features, train_data, method='plain', do_plot=False, no_regularization=no_regularization)
-        np.save('linear_lambdas/linear/subject{}_layer{}_seqlen{}_fold{}.npy'.format(subject, layer, seq_len, ind_num), chosen_lambdas)
         preds =  np.dot(test_features, weights)
         # weights: (40, 27905)
         del weights
