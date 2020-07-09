@@ -148,8 +148,6 @@ def cross_val_ridge(train_features,train_data,
             plt.figure()
             plt.imshow(r_cv,aspect='auto',cmap = 'RdBu_r');
 
-        import pdb
-        pdb.set_trace()
         argmin_lambda = np.argmin(r_cv,axis = 0)
         weights = np.zeros((train_features.shape[1],train_data.shape[1]))
         for idx_lambda in range(lambdas.shape[0]): # this is much faster than iterating over voxels!
@@ -179,7 +177,6 @@ def zero_unused_gradients(grad):
     return grad
 
 def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=False):
-    import pdb
     opt_lambdas_lrs = np.array(list(zip(opt_lambdas, opt_lrs)))
     unique_lambdas_lrs = np.unique(opt_lambdas_lrs, axis=0)
     num_lambdas = unique_lambdas_lrs.shape[0]
@@ -272,7 +269,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         else:
             final_preds[:, current_voxels] = preds_test[:, current_voxels]
 
-    # pdb.set_trace()
     del Xtest
     del Ytest
     return final_preds, train_losses, test_losses
@@ -384,8 +380,6 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
                 print("Time Elapsed: {}s".format(end_t - start_t))
                 print("========================")
         # Identify optimal lambda and use it to generate predictions
-        import pdb
-        pdb.set_trace()
         argmin_lambda = np.argmin(r_cv, axis=0)
         plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
         plt.xlim(0, 15)

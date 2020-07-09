@@ -11,6 +11,7 @@ from scipy.ndimage.filters import gaussian_filter
 
 from utils.global_params import n_folds, n_splits, sgd_noreg_lrs, sgd_reg_lrs
 from utils.ridge_tools import cross_val_ridge, corr, cross_val_ridge_mlp
+from utils.sklearn_ridge_tools import sklearn_cross_val_ridge, sklearn_cross_val_ridge_linear_sgd
 import time as tm
 
     
@@ -159,6 +160,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
 
     start_time = tm.time()
     if encoding_model == 'linear':
+        train_losses, test_losses = None, None
         # normalize data
         train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
         test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
@@ -170,6 +172,24 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         preds =  np.dot(test_features, weights)
         # weights: (40, 27905)
         del weights
+    elif encoding_model == 'linear_sklearn':
+        # normalize data
+        train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
+        test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
+        
+        train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
+        test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
+
+        preds = sklearn_cross_val_ridge(train_features, train_data, test_features, test_data, method='plain', do_plot=False, no_regularization=no_regularization)
+    elif encoding_model == 'linear_sgd_sklearn':
+        # normalize data
+        train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
+        test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
+        
+        train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
+        test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
+
+        preds = sklearn_cross_val_ridge_linear_sgd(train_features, train_data, test_features, test_data, no_regularization=no_regularization)
     else:
         vox_subdirname = 'roivoxels/' if use_roi_voxels else 'allvoxels/'
         preds_dir = '{}/mlp_fold_preds/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
