@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.model_selection import KFold
-import sklearn.linear_model import Ridge, SGDRegressor
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.linear_model import Ridge, SGDRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -61,7 +62,7 @@ def sklearn_linear_sgd(X, Y, lmbda):
     - eta0=1e-2: Initial learning rate
     """
     model = make_pipeline(StandardScaler(), 
-                        SGDRegressor(loss='squared_loss', penalty='l2', alpha=lmbda))
+                        MultiOutputRegressor(SGDRegressor(loss='squared_loss', penalty='l2', alpha=lmbda), n_jobs=-1))
     model.fit(X, Y)
     return model
 
