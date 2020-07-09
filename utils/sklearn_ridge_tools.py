@@ -77,6 +77,9 @@ def sklearn_linear_sgd_train(X, Y, Xval, Yval, lambdas):
 def sklearn_cross_val_ridge_linear_sgd(train_features, train_data, test_features, test_data,
                                         lambdas=np.array([10**i for i in range(-6, 10)]),
                                         no_regularization=True):
+    nL = lambdas.shape[0]
+    r_cv = np.zeros((nL, train_data.shape[1]))
+    
     kf = KFold(n_splits=n_splits)
     # Gather recorded costs from training with each lambda
     for ind_num, (trn, val) in enumerate(kf.split(train_data)):
