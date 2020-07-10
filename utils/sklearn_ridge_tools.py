@@ -4,6 +4,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.linear_model import Ridge, SGDRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+import time
 
 from utils.global_params import n_splits
 
@@ -53,16 +54,16 @@ def sklearn_cross_val_ridge(train_features,train_data,
     return preds
 
 def sklearn_linear_sgd(X, Y, lmbda):
-    """
-    Default params for SGDRegressor:
-    - tol=1e-3: Training stops when (loss > best_loss - tol) for n_iter_no_change epochs
-    - n_iter_no_change=5
-    - max_iter=1000
-    - learning_rate='invscaling'
-    - eta0=1e-2: Initial learning rate
-    """
-    model = make_pipeline(StandardScaler(), 
-                        MultiOutputRegressor(SGDRegressor(loss='squared_loss', penalty='l2', alpha=lmbda), n_jobs=-1))
+    # """
+    # Default params for SGDRegressor:
+    # - tol=1e-3: Training stops when (loss > best_loss - tol) for n_iter_no_change epochs
+    # - n_iter_no_change=5
+    # - max_iter=1000
+    # - learning_rate='invscaling'
+    # - eta0=1e-2: Initial learning rate
+    # """
+    model = MultiOutputRegressor(SGDRegressor(loss='squared_loss', penalty='l2', alpha=lmbda), n_jobs=-1)
+    # model = Ridge(alpha=lmbda, solver='sag')
     model.fit(X, Y)
     return model
 
@@ -79,15 +80,21 @@ def sklearn_cross_val_ridge_linear_sgd(train_features, train_data, test_features
                                         no_regularization=True):
     nL = lambdas.shape[0]
     r_cv = np.zeros((nL, train_data.shape[1]))
-    
+
     kf = KFold(n_splits=n_splits)
     # Gather recorded costs from training with each lambda
     for ind_num, (trn, val) in enumerate(kf.split(train_data)):
+        s = time.time()
         cost = sklearn_linear_sgd_train(train_features[trn], train_data[trn],
                                         train_features[val], train_data[val],
                                         lambdas=lambdas)
         r_cv += cost
+        e = time.time()
+        print("Split: {}".format(ind_num))
+        print("Time Taken: {}s".format(e-s))        
 
+    print("Prediction")
+    s = time.time()
     argmin_lambda = np.argmin(r_cv, axis=0)
     preds = np.zeros((test_data.shape[0], test_data.shape[1]))
     for idx_lambda in np.unique(argmin_lambda):
@@ -95,6 +102,8 @@ def sklearn_cross_val_ridge_linear_sgd(train_features, train_data, test_features
         model = sklearn_linear_sgd(train_features, train_data[:, idx_vox], lambdas[idx_lambda])
         curr_preds = model.predict(test_features)
         preds[:, idx_vox] = curr_preds
+    e = time.time()
+    print("Time Taken: {}s".format(e-s))
     return preds
     
 

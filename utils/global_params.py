@@ -6,7 +6,8 @@ import numpy as np
 ####################################################################
 
 n_folds = 4
-encoding_model_options = ['linear', 'linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'mlp_forloop', 'mlp_smallerhiddensize', 'mlp_largerhiddensize', 'mlp_additionalhiddenlayer', 'linear_sklearn', 'linear_sgd_sklearn']
+encoding_model_options = ['linear', 'linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'mlp_forloop', 'mlp_smallerhiddensize', \
+                            'mlp_largerhiddensize', 'mlp_additionalhiddenlayer', 'linear_sklearn', 'linear_sgd_sklearn', 'linear_gd']
 n_splits = 10 # When training on each fold, train data is further split up into n_splits to compute model costs and pick an optimal lambda during ridge regression
 lr_when_no_regularization = 1e-3
 model_checkpoint_dir = 'model_checkpoints/'
@@ -29,8 +30,10 @@ sgd_noreg_n_epochs = {'linear_sgd': 27,
 sgd_reg_lrs = {'linear_sgd': np.array([1e-3]*16),
                 'mlp_sharedhidden': np.array([1e-2]*2 + [1e-3]*14),
                 'mlp_separatehidden': np.array([1e-2]*16),
-                'mlp_forloop': np.array([1e-2]*16)}
+                'mlp_forloop': np.array([1e-2]*16),
+                'linear_gd': np.array([1e-2]*9 + [1e-1]*7)}
 sgd_reg_n_epochs = {'linear_sgd': np.array([38]*16),
                     'mlp_sharedhidden': np.array([40]*16),
                     'mlp_separatehidden': np.array([20]*16),
-                    'mlp_forloop': np.array([20]*16)}
+                    'mlp_forloop': np.array([20]*16),
+                    'linear_gd': np.array([100]*4 + [110,120,150,175,200,220,250,275,300,300,350,350])}

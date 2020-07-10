@@ -160,7 +160,6 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
 
     start_time = tm.time()
     if encoding_model == 'linear':
-        train_losses, test_losses = None, None
         # normalize data
         train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
         test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
@@ -237,11 +236,14 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
         test_ind = ind==fold_num
         corrs_d, preds_d, train_losses_d, test_losses_d, all_test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
                                                                                                         data, predict_feat_dict)
+        fname = encoding_model + '/fold_{}.npy'
+        os.makedirs(encoding_model + '/', exist_ok=True)
+        np.save(fname.format(fold_num), {'corrs_d':corrs_d,'preds_d':preds_d,'test_d':all_test_data,'train_losses_d':train_losses_d,'test_losses_t':test_losses_d})
     else:
         corrs_d = np.zeros((n_folds, n_voxels))
         preds_d = np.zeros((n_words, n_voxels))
         train_losses_d, test_losses_d = None, None
-        if encoding_model != 'linear':
+        if encoding_model not in ['linear', 'linear_sklearn', 'linear_sgd_sklearn']:
             train_losses_d = {}
             test_losses_d = {}
         all_test_data = []
@@ -256,7 +258,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
             corrs_d[ind_num,:] = corrs
             preds_d[test_ind] = preds
 
-            if encoding_model != 'linear':
+            if encoding_model not in ['linear', 'linear_sklearn', 'linear_sgd_sklearn']:
                 train_losses_d[ind_num] = train_losses
                 test_losses_d[ind_num] = test_losses
             

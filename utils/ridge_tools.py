@@ -186,7 +186,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xtest, Ytest = torch.from_numpy(Xtest).float(), torch.from_numpy(Ytest).float()
 
-    minibatch_size = model_dict['minibatch_size']
+    if model_dict['minibatch_size'] is None:
+        minibatch_size = X.shape[0]
+    else:
+        minibatch_size = model_dict['minibatch_size']
     num_batches = X.shape[0]//minibatch_size
     train_losses = np.zeros((num_lambdas, max_n_epochs))
     test_losses = np.zeros((max_n_epochs, num_voxels))
@@ -286,7 +289,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval).to(device)
 
     epoch_losses, val_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((num_lambdas, max_n_epochs, num_voxels))
-    minibatch_size = model_dict['minibatch_size']
+    if model_dict['minibatch_size'] is None:
+        minibatch_size = X.shape[0]
+    else:
+        minibatch_size = model_dict['minibatch_size']
     num_batches = X.shape[0]//minibatch_size
     
     for idx,lmbda in enumerate(lambdas):
@@ -384,7 +390,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
         plt.xlim(0, 15)
         plt.ylim(0,28000)
-        plt.savefig('temp.png')
+        plt.savefig('argmin_lambdas.png')
         opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
         preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
     return preds, train_losses, test_losses
@@ -416,9 +422,11 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, allvoxels_minibatch_size
     elif encoding_model == 'mlp_sharedhidden':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, allvoxels_minibatch_size
+    elif encoding_model == 'linear_gd':
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [], num_voxels, None
     model_dict = dict(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
-    if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden']:
+    if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd']:
         # Train and predict for one voxel at a time
         preds = torch.zeros((num_voxels, n_test))
         train_losses = np.zeros((num_voxels, max_n_epochs))
