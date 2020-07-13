@@ -200,11 +200,13 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     Ytest = torch.where(torch.isnan(Ytest), torch.zeros_like(Ytest), Ytest).to(device)
 
     for idx, (lmbda, lr) in enumerate(unique_lambdas_lrs):
+        print("Lambda: {}".format(lmbda))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
         optimizer = optim.Adam(model.parameters(), lr=lr)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
@@ -217,6 +219,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         current_voxels = opt_lambdas == lmbda
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
         for epoch in range(curr_n_epochs):
+            print("Epoch: {}".format(epoch))
+            print("LR: {}".format(optimizer.param_groups[0]['lr']))
             model.train()
             permutation = torch.randperm(X.shape[0])
             epoch_loss = 0
@@ -260,6 +264,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
               test_losses[epoch][current_voxels] = test_loss.detach().cpu()
             else:
               test_losses[epoch][current_voxels] = test_loss[current_voxels].detach().cpu()
+            
+            scheduler.step(epoch_loss)
 
         # Load checkpoint from previous epoch
         # model.load_state_dict(torch.load(checkpoint_path))
@@ -296,16 +302,20 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     num_batches = X.shape[0]//minibatch_size
     
     for idx,lmbda in enumerate(lambdas):
+        print("Lambda: {}".format(lmbda))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         optimizer = optim.Adam(model.parameters(), lr=lrs[idx])
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
         
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
         for epoch in range(curr_n_epochs):
+            print("Epoch: {}".format(epoch))
+            print("LR: {}".format(optimizer.param_groups[0]['lr']))
             model.train()
             permutation = torch.randperm(X.shape[0])
             epoch_loss = 0.
@@ -344,6 +354,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             epoch_loss /= num_batches
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach().cpu()
+
+            scheduler.step(epoch_loss)
 
             del preds_val
             del val_loss
