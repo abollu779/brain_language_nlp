@@ -136,6 +136,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
     subject = predict_feat_dict['subject']
     use_roi_voxels = predict_feat_dict['use_roi_voxels']
     no_regularization = predict_feat_dict['no_regularization']
+    predict_feat_dict['fold_num'] = ind_num
 
     word_CV_ind = TR_to_word_CV_ind(train_ind)
     train_losses, test_losses = None, None
@@ -203,7 +204,16 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
             lrs = sgd_noreg_lrs[encoding_model]
         else:
             lrs = sgd_reg_lrs[encoding_model]
-        preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, lrs=lrs, no_regularization=no_regularization)
+
+        if encoding_model == 'linear_gd':
+            # normalize data once since we won't be dealing with minibatches in this case 
+            train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
+            test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)
+            
+            train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
+            test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
+
+        preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, predict_feat_dict, lrs=lrs, no_regularization=no_regularization)
         preds = preds.detach().cpu().numpy()
 
         os.makedirs(preds_dir, exist_ok=True)

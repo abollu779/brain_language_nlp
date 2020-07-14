@@ -176,6 +176,12 @@ def zero_unused_gradients(grad):
         grad[i+1:, scol:ecol] = 0
     return grad
 
+def normalize_torch_tensor(t):
+    t = torch.where(torch.isnan(t), torch.zeros_like(t), t)
+    norm_t = (t - t.mean(0))/t.std(0)
+    norm_t = torch.where(torch.isnan(norm_t), torch.zeros_like(norm_t), norm_t)
+    return norm_t
+
 def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=False):
     opt_lambdas_lrs = np.array(list(zip(opt_lambdas, opt_lrs)))
     unique_lambdas_lrs = np.unique(opt_lambdas_lrs, axis=0)
@@ -195,12 +201,12 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     test_losses = np.zeros((max_n_epochs, num_voxels))
     final_preds = torch.zeros_like(Ytest).to(device)
 
-    # normalize test data
-    Xtest = torch.where(torch.isnan(Xtest), torch.zeros_like(Xtest), Xtest).to(device)
-    Ytest = torch.where(torch.isnan(Ytest), torch.zeros_like(Ytest), Ytest).to(device)
+    if model_dict['model_name'] != 'linear_gd':
+        # normalize test data
+        Xtest = normalize_torch_tensor(Xtest).to(device)
+        Ytest = normalize_torch_tensor(Ytest).to(device)
 
     for idx, (lmbda, lr) in enumerate(unique_lambdas_lrs):
-        print("Lambda: {}".format(lmbda))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
@@ -219,8 +225,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         current_voxels = opt_lambdas == lmbda
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
         for epoch in range(curr_n_epochs):
-            print("Epoch: {}".format(epoch))
-            print("LR: {}".format(optimizer.param_groups[0]['lr']))
             model.train()
             permutation = torch.randperm(X.shape[0])
             epoch_loss = 0
@@ -230,9 +234,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
                 indices = permutation[i:i+minibatch_size]
                 batch_X, batch_Y = X[indices], Y[indices]
 
-                # normalize batch data
-                batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X).to(device)
-                batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y).to(device)
+                if model_dict['model_name'] != 'linear_gd':
+                    # normalize batch data
+                    batch_X = normalize_torch_tensor(batch_X).to(device)
+                    batch_Y = normalize_torch_tensor(batch_Y).to(device)
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
@@ -290,9 +295,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xval, Yval = torch.from_numpy(Xval).float(), torch.from_numpy(Yval).float()
     
-    # normalize validation data
-    Xval = torch.where(torch.isnan(Xval), torch.zeros_like(Xval), Xval).to(device)
-    Yval = torch.where(torch.isnan(Yval), torch.zeros_like(Yval), Yval).to(device)
+    if model_dict['model_name'] != 'linear_gd':
+        # normalize validation data
+        Xval = normalize_torch_tensor(Xval).to(device)
+        Yval = normalize_torch_tensor(Yval).to(device)
 
     epoch_losses, val_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((num_lambdas, max_n_epochs, num_voxels))
     if model_dict['minibatch_size'] is None:
@@ -302,7 +308,6 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     num_batches = X.shape[0]//minibatch_size
     
     for idx,lmbda in enumerate(lambdas):
-        print("Lambda: {}".format(lmbda))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
@@ -314,8 +319,6 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
         for epoch in range(curr_n_epochs):
-            print("Epoch: {}".format(epoch))
-            print("LR: {}".format(optimizer.param_groups[0]['lr']))
             model.train()
             permutation = torch.randperm(X.shape[0])
             epoch_loss = 0.
@@ -325,9 +328,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 indices = permutation[i:i+minibatch_size]
                 batch_X, batch_Y = X[indices], Y[indices]
 
-                # normalize batch data
-                batch_X = torch.where(torch.isnan(batch_X), torch.zeros_like(batch_X), batch_X).to(device)
-                batch_Y = torch.where(torch.isnan(batch_Y), torch.zeros_like(batch_Y), batch_Y).to(device)
+                if model_dict['model_name'] != 'linear_gd':
+                    # normalize batch data
+                    batch_X = normalize_torch_tensor(batch_X).to(device)
+                    batch_Y = normalize_torch_tensor(batch_Y).to(device)
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
@@ -374,7 +378,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     del Yval
     return cost
 
-def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, n_epochs, is_mlp_separatehidden=False, no_regularization=True):
+def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, test_Y, lambdas, lrs, n_epochs, predict_feat_dict, is_mlp_separatehidden=False, no_regularization=True):
     import utils.utils as general_utils
     num_lambdas = lambdas.shape[0]
     num_voxels = 1 if (len(train_Y.shape) == 1) else train_Y.shape[1]
@@ -402,12 +406,16 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
         plt.xlim(0, 15)
         plt.ylim(0,28000)
-        plt.savefig('argmin_lambdas.png')
+        argmin_lambdas_dir = 'argmin_lambda_indices/'
+        os.makedirs(argmin_lambdas_dir, exist_ok=True)
+        plt.savefig('{}{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
+        np.save('{}{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
+
         opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
         preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
     return preds, train_losses, test_losses
 
-def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data,
+def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, predict_feat_dict,
                         lambdas=np.array([10**i for i in range(-6,10)]), lrs=np.array([1e-3]*16),
                         no_regularization = True):
     num_voxels = train_data.shape[1]
@@ -436,7 +444,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, allvoxels_minibatch_size
     elif encoding_model == 'linear_gd':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [], num_voxels, None
-    model_dict = dict(input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
+    model_dict = dict(model_name=encoding_model, input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
     if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd']:
         # Train and predict for one voxel at a time
@@ -447,7 +455,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         start_t = time.time()
         for ivox in range(num_voxels):
             vox_preds, vox_train_losses, vox_test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data[:, ivox],
-                                                                                        test_features, test_data[:, ivox], lambdas, lrs, n_epochs, no_regularization=no_regularization)
+                                                                                        test_features, test_data[:, ivox], lambdas, lrs, n_epochs, predict_feat_dict, no_regularization=no_regularization)
             
             # Store predictions and model losses
             preds[ivox] = vox_preds.squeeze()
@@ -465,7 +473,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         is_mlp_separatehidden = (encoding_model == 'mlp_separatehidden')
         # Train and predict for all voxels at once
         preds, train_losses, test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data, test_features,
-                                                                                test_data, lambdas, lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden, no_regularization=no_regularization)
+                                                                                test_data, lambdas, lrs, n_epochs, predict_feat_dict, is_mlp_separatehidden=is_mlp_separatehidden, no_regularization=no_regularization)
         # preds: (N_test, num_voxels)
         # train_losses, test_losses: (max_n_epochs, )
     return preds, train_losses, test_losses
