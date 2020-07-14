@@ -203,8 +203,9 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
 
     if model_dict['model_name'] != 'linear_gd':
         # normalize test data
-        Xtest = normalize_torch_tensor(Xtest).to(device)
-        Ytest = normalize_torch_tensor(Ytest).to(device)
+        Xtest = normalize_torch_tensor(Xtest)
+        Ytest = normalize_torch_tensor(Ytest)
+    Xtest, Ytest = Xtest.to(device), Ytest.to(device)
 
     for idx, (lmbda, lr) in enumerate(unique_lambdas_lrs):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
@@ -236,8 +237,9 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
 
                 if model_dict['model_name'] != 'linear_gd':
                     # normalize batch data
-                    batch_X = normalize_torch_tensor(batch_X).to(device)
-                    batch_Y = normalize_torch_tensor(batch_Y).to(device)
+                    batch_X = normalize_torch_tensor(batch_X)
+                    batch_Y = normalize_torch_tensor(batch_Y)
+                batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
@@ -297,8 +299,9 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     
     if model_dict['model_name'] != 'linear_gd':
         # normalize validation data
-        Xval = normalize_torch_tensor(Xval).to(device)
-        Yval = normalize_torch_tensor(Yval).to(device)
+        Xval = normalize_torch_tensor(Xval)
+        Yval = normalize_torch_tensor(Yval)
+    Xval, Yval = Xval.to(device), Yval.to(device)
 
     epoch_losses, val_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((num_lambdas, max_n_epochs, num_voxels))
     if model_dict['minibatch_size'] is None:
@@ -332,6 +335,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                     # normalize batch data
                     batch_X = normalize_torch_tensor(batch_X).to(device)
                     batch_Y = normalize_torch_tensor(batch_Y).to(device)
+                batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
 
                 batch_preds = model(batch_X)
                 batch_loss = criterion(batch_preds.squeeze(), batch_Y)
