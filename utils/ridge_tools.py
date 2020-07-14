@@ -391,16 +391,14 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         kf = KFold(n_splits=n_splits)
         # Gather recorded costs from training with each lambda
         for ind_num, (trn, val) in enumerate(kf.split(train_Y)):
-            if is_mlp_separatehidden:
-                start_t = time.time()
-                print("======= Split {} =======".format(ind_num))
+            start_t = time.time()
+            print("======= Split {} =======".format(ind_num))
 
             cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs, ind_num, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden) # cost: (num_lambdas, )
             r_cv += cost
-            if is_mlp_separatehidden:
-                end_t = time.time()
-                print("Time Elapsed: {}s".format(end_t - start_t))
-                print("========================")
+            end_t = time.time()
+            print("Time Elapsed: {}s".format(end_t - start_t))
+            print("========================")
         # Identify optimal lambda and use it to generate predictions
         argmin_lambda = np.argmin(r_cv, axis=0)
         plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
