@@ -367,7 +367,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
             if (epoch == 0) or (epoch == curr_n_epochs-1):
                 print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
-                print("Grad Norms: {}".format(model.model[0].weight.grad))
+                print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
                 if epoch == curr_n_epochs-1:
                     import pdb
                     pdb.set_trace()
