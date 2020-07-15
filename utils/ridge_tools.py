@@ -365,9 +365,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             val_losses[idx, epoch] = val_loss.detach().cpu()
 
             prev_lr = optimizer.param_groups[0]['lr']
-
+            sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
             scheduler.step(epoch_loss)
-
             new_lr = optimizer.param_groups[0]['lr']
             if new_lr != prev_lr:
                 print("Epoch: {}, LR: {}".format(epoch, new_lr))
@@ -376,7 +375,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             # if (epoch == 0) or (epoch == curr_n_epochs-1):
                 # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
                 # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
-                print("Epoch: {}, Sum Grad Norm: {}".format(epoch, torch.abs(model.model[0].weight.grad).sum()))
+                print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
                 if epoch == curr_n_epochs-1:
                     import pdb
                     pdb.set_trace()
