@@ -434,8 +434,6 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         plt.savefig('{}{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
         np.save('{}{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
 
-        import pdb
-        pdb.set_trace()
         opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
         preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
     return preds, train_losses, test_losses
