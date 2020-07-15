@@ -366,7 +366,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             scheduler.step(epoch_loss)
 
             if (epoch == 0) or (epoch == curr_n_epochs-1):
-                print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
+                print("Lambda: {}, Epoch: {}, LR: {}".format(lmbda, epoch, optimizer.param_groups[0]['lr']))
                 print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
                 if epoch == curr_n_epochs-1:
                     import pdb
