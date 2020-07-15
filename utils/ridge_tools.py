@@ -363,10 +363,16 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach().cpu()
 
+            prev_lr = optimizer.param_groups[0]['lr']
+
             scheduler.step(epoch_loss)
 
+            new_lr = optimizer.param_groups[0]['lr']
+            if new_lr != prev_lr:
+                print("Epoch: {}, LR: {}".format(epoch, new_lr))
+
             if (epoch == 0) or (epoch == curr_n_epochs-1):
-                print("Lambda: {}, Epoch: {}, LR: {}".format(lmbda, epoch, optimizer.param_groups[0]['lr']))
+                print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
                 print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
                 if epoch == curr_n_epochs-1:
                     import pdb
