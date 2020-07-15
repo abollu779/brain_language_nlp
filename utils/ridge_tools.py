@@ -386,7 +386,11 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
         del model
 
-    cost = val_losses[:,-1,:] # (num_lambdas, num_voxels)
+    # Collect last epoch's validation costs
+    cost = []
+    for (lmbda_idx, epochs_spent_training) in enumerate(n_epochs):
+        cost.append(val_losses[lmbda_idx, epochs_spent_training-1])
+    cost = np.array(cost) # (num_lambdas, num_voxels)
 
     import os
     epoch_losses_path, val_losses_path = 'mlp_losses/train_split{}.npy'.format(split), 'mlp_losses/val_split{}.npy'.format(split)
