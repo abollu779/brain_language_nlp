@@ -392,11 +392,11 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         cost.append(val_losses[lmbda_idx, epochs_spent_training-1])
     cost = np.array(cost) # (num_lambdas, num_voxels)
 
-    import os
-    epoch_losses_path, val_losses_path = 'mlp_losses/train_split{}.npy'.format(split), 'mlp_losses/val_split{}.npy'.format(split)
-    os.makedirs('mlp_losses/', exist_ok=True)
-    np.save(epoch_losses_path, epoch_losses)
-    np.save(val_losses_path, val_losses)
+    # import os
+    # epoch_losses_path, val_losses_path = 'mlp_losses/train_split{}.npy'.format(split), 'mlp_losses/val_split{}.npy'.format(split)
+    # os.makedirs('mlp_losses/', exist_ok=True)
+    # np.save(epoch_losses_path, epoch_losses)
+    # np.save(val_losses_path, val_losses)
     
     del Xval
     del Yval
