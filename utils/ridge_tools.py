@@ -315,7 +315,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         optimizer = optim.Adam(model.parameters(), lr=lrs[idx])
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', min_lr=lrs[idx]*1e-2)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', min_lr=lrs[idx]*1e-1)
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
