@@ -365,6 +365,13 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
             scheduler.step(epoch_loss)
 
+            if (epoch == 0) or (epoch == curr_n_epochs-1):
+                print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
+                print("Grad Norms: {}".format(model.model[0].weight.grad))
+                if epoch == curr_n_epochs-1:
+                    import pdb
+                    pdb.set_trace()
+
             del preds_val
             del val_loss
 
@@ -405,6 +412,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
             print("========================")
         # Identify optimal lambda and use it to generate predictions
         argmin_lambda = np.argmin(r_cv, axis=0)
+        import matplotlib.pyplot as plt
         plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
         plt.xlim(0, 15)
         plt.ylim(0,28000)
