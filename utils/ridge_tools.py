@@ -213,7 +213,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         criterion = nn.MSELoss(reduction='mean')
         criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
         optimizer = optim.Adam(model.parameters(), lr=lr)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', min_lr=lrs[idx]*1e-1)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
@@ -272,7 +272,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             else:
               test_losses[epoch][current_voxels] = test_loss[current_voxels].detach().cpu()
             
-            scheduler.step(epoch_loss)
+            sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
+            scheduler.step(sum_grad_norm)
 
         # Load checkpoint from previous epoch
         # model.load_state_dict(torch.load(checkpoint_path))
@@ -316,7 +317,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         optimizer = optim.Adam(model.parameters(), lr=lrs[idx])
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', min_lr=lrs[idx]*1e-1)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
@@ -366,7 +367,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
-            scheduler.step(epoch_loss)
+            scheduler.step(sum_grad_norm)
             new_lr = optimizer.param_groups[0]['lr']
             if new_lr != prev_lr:
                 print("Epoch: {}, LR: {}".format(epoch, new_lr))
