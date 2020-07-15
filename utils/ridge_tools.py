@@ -213,7 +213,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         criterion = nn.MSELoss(reduction='mean')
         criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
         optimizer = optim.Adam(model.parameters(), lr=lr)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', min_lr=1e-5)
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
@@ -315,7 +315,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         optimizer = optim.Adam(model.parameters(), lr=lrs[idx])
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', min_lr=1e-5)
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
@@ -374,6 +374,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             if (epoch == 0) or (epoch == curr_n_epochs-1):
                 print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
                 print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
+                print("Sum Grad Norm: {}".format(torch.abs(model.model[0].weight.grad).sum()))
                 if epoch == curr_n_epochs-1:
                     import pdb
                     pdb.set_trace()
