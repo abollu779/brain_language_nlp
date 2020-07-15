@@ -365,21 +365,21 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach().cpu()
 
-            prev_lr = optimizer.param_groups[0]['lr']
+            # prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
             scheduler.step(sum_grad_norm)
-            new_lr = optimizer.param_groups[0]['lr']
-            if new_lr != prev_lr:
-                print("Epoch: {}, LR: {}".format(epoch, new_lr))
+            # new_lr = optimizer.param_groups[0]['lr']
+            # if new_lr != prev_lr:
+            #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
 
-            if (epoch%50 == 0) or (epoch == curr_n_epochs-1):
-            # if (epoch == 0) or (epoch == curr_n_epochs-1):
-                # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
-                # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
-                print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
-                if epoch == curr_n_epochs-1:
-                    import pdb
-                    pdb.set_trace()
+            # if (epoch%50 == 0) or (epoch == curr_n_epochs-1):
+            # # if (epoch == 0) or (epoch == curr_n_epochs-1):
+            #     # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
+            #     # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
+            #     print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
+            #     if epoch == curr_n_epochs-1:
+            #         import pdb
+            #         pdb.set_trace()
 
             del preds_val
             del val_loss
@@ -430,6 +430,8 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         plt.savefig('{}{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
         np.save('{}{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
 
+        import pdb
+        pdb.set_trace()
         opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
         preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
     return preds, train_losses, test_losses
