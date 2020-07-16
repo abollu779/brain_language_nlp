@@ -201,7 +201,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     test_losses = np.zeros((max_n_epochs, num_voxels))
     final_preds = torch.zeros_like(Ytest).to(device)
 
-    if model_dict['model_name'] != 'linear_gd':
+    if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd']:
         # normalize test data
         Xtest = normalize_torch_tensor(Xtest)
         Ytest = normalize_torch_tensor(Ytest)
@@ -235,7 +235,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
                 indices = permutation[i:i+minibatch_size]
                 batch_X, batch_Y = X[indices], Y[indices]
 
-                if model_dict['model_name'] != 'linear_gd':
+                if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd']:
                     # normalize batch data
                     batch_X = normalize_torch_tensor(batch_X)
                     batch_Y = normalize_torch_tensor(batch_Y)
@@ -298,7 +298,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xval, Yval = torch.from_numpy(Xval).float(), torch.from_numpy(Yval).float()
     
-    if model_dict['model_name'] != 'linear_gd':
+    if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd']:
         # normalize validation data
         Xval = normalize_torch_tensor(Xval)
         Yval = normalize_torch_tensor(Yval)
@@ -334,7 +334,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 indices = permutation[i:i+minibatch_size]
                 batch_X, batch_Y = X[indices], Y[indices]
 
-                if model_dict['model_name'] != 'linear_gd':
+                if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd']:
                     # normalize batch data
                     batch_X = normalize_torch_tensor(batch_X).to(device)
                     batch_Y = normalize_torch_tensor(batch_Y).to(device)
@@ -468,9 +468,11 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, allvoxels_minibatch_size
     elif encoding_model == 'linear_gd':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [], num_voxels, None
+    elif encoding_model == 'mlp_sharedhidden_gd':
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, None
     model_dict = dict(model_name=encoding_model, input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
-    if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd']:
+    if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd', 'mlp_sharedhidden_gd']:
         # Train and predict for one voxel at a time
         preds = torch.zeros((num_voxels, n_test))
         train_losses = np.zeros((num_voxels, max_n_epochs))
