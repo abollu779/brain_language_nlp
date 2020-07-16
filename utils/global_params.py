@@ -14,6 +14,7 @@ lr_when_no_regularization = 1e-3
 model_checkpoint_dir = 'model_checkpoints/'
 allvoxels_minibatch_size = 32
 new_lr_window = 10
+min_lr = 1e-8
 
 ###################################################################
 # Learning Rates for Different Models (Experimentally Determined) #
