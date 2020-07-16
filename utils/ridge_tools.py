@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 
 from utils.global_params import n_splits, allvoxels_minibatch_size, lr_when_no_regularization, \
-                                model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs
+                                model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs, patience
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -318,12 +318,13 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         optimizer = optim.Adam(model.parameters(), lr=lrs[idx])
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
         
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
+        sum_grad_norms = np.zeros(curr_n_epochs,)
         for epoch in range(curr_n_epochs):
             model.train()
             permutation = torch.randperm(X.shape[0])
@@ -368,7 +369,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
-            scheduler.step(sum_grad_norm)
+            if epoch > patience and sum_grad_norms[epoch-patience:epoch].min() < sum_grad_norm:
+                optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
+            sum_grad_norms[epoch] = sum_grad_norm
+            # scheduler.step(sum_grad_norm)
             new_lr = optimizer.param_groups[0]['lr']
             if new_lr != prev_lr:
                 print("Epoch: {}, LR: {}".format(epoch, new_lr))
@@ -386,6 +390,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             del val_loss
 
         del model
+        del sum_grad_norms
 
     # Collect last epoch's validation costs
     cost = []
