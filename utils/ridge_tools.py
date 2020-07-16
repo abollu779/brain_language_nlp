@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 
 from utils.global_params import n_splits, allvoxels_minibatch_size, lr_when_no_regularization, \
-                                model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs, patience
+                                model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs, new_lr_window
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -325,6 +325,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
         sum_grad_norms = np.zeros(curr_n_epochs,)
+        cooldown = 0
         for epoch in range(curr_n_epochs):
             model.train()
             permutation = torch.randperm(X.shape[0])
@@ -367,10 +368,17 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach().cpu()
 
+            if cooldown > 0:
+                if cooldown == new_lr_window+1:
+                    cooldown = 0
+                else:
+                    cooldown += 1
+
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
-            if epoch > patience and sum_grad_norms[epoch-patience:epoch].min() < sum_grad_norm:
+            if epoch > new_lr_window and cooldown == 0 and sum_grad_norms[epoch-new_lr_window:epoch].min() < sum_grad_norm:
                 optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
+                cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
             # scheduler.step(sum_grad_norm)
             new_lr = optimizer.param_groups[0]['lr']
