@@ -14,7 +14,7 @@ from collections import Counter
 
 from utils.global_params import n_splits, allvoxels_minibatch_size, lr_when_no_regularization, \
                                 model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs, \
-                                new_lr_window, min_lr
+                                new_lr_window, min_lr, cooldown_period
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -370,7 +370,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             val_losses[idx, epoch] = val_loss.detach().cpu()
 
             if cooldown > 0:
-                if cooldown == new_lr_window+1:
+                if cooldown == cooldown_period:
                     cooldown = 0
                 else:
                     cooldown += 1
