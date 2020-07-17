@@ -136,6 +136,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
     subject = predict_feat_dict['subject']
     use_roi_voxels = predict_feat_dict['use_roi_voxels']
     no_regularization = predict_feat_dict['no_regularization']
+    fold_output_dir = predict_feat_dict['fold_output_dir']
     predict_feat_dict['fold_num'] = ind_num
 
     word_CV_ind = TR_to_word_CV_ind(train_ind)
@@ -191,13 +192,16 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
 
         preds = sklearn_cross_val_ridge_linear_sgd(train_features, train_data, test_features, test_data, no_regularization=no_regularization)
     else:
-        vox_subdirname = 'roivoxels/' if use_roi_voxels else 'allvoxels/'
-        preds_dir = '{}/mlp_fold_preds/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
+        if fold_output_dir is not None:
+            pred_dir = fold_output_dir
+        else:
+            vox_subdirname = 'roivoxels/' if use_roi_voxels else 'allvoxels/'
+            preds_dir = '{}/mlp_fold_preds/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
         preds_path = preds_dir + 'fold_{}.npy'.format(ind_num)
-        train_losses_dir = '{}/mlp_fold_train_losses/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
-        train_losses_path = train_losses_dir + 'fold_{}.npy'.format(ind_num)
-        test_losses_dir = '{}/mlp_fold_test_losses/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
-        test_losses_path = test_losses_dir + 'fold_{}.npy'.format(ind_num)
+        # train_losses_dir = '{}/mlp_fold_train_losses/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
+        # train_losses_path = train_losses_dir + 'fold_{}.npy'.format(ind_num)
+        # test_losses_dir = '{}/mlp_fold_test_losses/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
+        # test_losses_path = test_losses_dir + 'fold_{}.npy'.format(ind_num)
 
         s_t = tm.time()
         if no_regularization:
@@ -216,11 +220,11 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, predict_feat_dict, lrs=lrs, no_regularization=no_regularization)
         preds = preds.detach().cpu().numpy()
 
-        # os.makedirs(preds_dir, exist_ok=True)
+        os.makedirs(preds_dir, exist_ok=True)
         # os.makedirs(train_losses_dir, exist_ok=True)
         # os.makedirs(test_losses_dir, exist_ok=True)
         
-        # np.save(preds_path, preds)
+        np.save(preds_path, preds)
         # np.save(train_losses_path, train_losses)
         # np.save(test_losses_path, test_losses)
         # preds: (N_test, 27905)

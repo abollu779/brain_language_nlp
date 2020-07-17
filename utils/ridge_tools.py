@@ -14,7 +14,7 @@ from collections import Counter
 
 from utils.global_params import n_splits, allvoxels_minibatch_size, lr_when_no_regularization, \
                                 model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs, \
-                                new_lr_window, min_lr, cooldown_period
+                                new_lr_window, min_lr, cooldown_period, min_sum_grad_norm
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -193,20 +193,19 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xtest, Ytest = torch.from_numpy(Xtest).float(), torch.from_numpy(Ytest).float()
 
-    if model_dict['minibatch_size'] is None:
-        minibatch_size = X.shape[0]
-    else:
-        minibatch_size = model_dict['minibatch_size']
-    num_batches = X.shape[0]//minibatch_size
-    train_losses = np.zeros((num_lambdas, max_n_epochs))
-    test_losses = np.zeros((max_n_epochs, num_voxels))
-    final_preds = torch.zeros_like(Ytest).to(device)
-
     if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd']:
         # normalize test data
         Xtest = normalize_torch_tensor(Xtest)
         Ytest = normalize_torch_tensor(Ytest)
     Xtest, Ytest = Xtest.to(device), Ytest.to(device)
+
+    train_losses, test_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((max_n_epochs, num_voxels))
+    if model_dict['minibatch_size'] is None:
+        minibatch_size = X.shape[0]
+    else:
+        minibatch_size = model_dict['minibatch_size']
+    num_batches = X.shape[0]//minibatch_size
+    final_preds = torch.zeros_like(Ytest).to(device)
 
     for idx, (lmbda, lr) in enumerate(unique_lambdas_lrs):
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
@@ -214,7 +213,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         criterion = nn.MSELoss(reduction='mean')
         criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
         optimizer = optim.Adam(model.parameters(), lr=lr)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
@@ -226,6 +225,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     
         current_voxels = opt_lambdas == lmbda
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
+        sum_grad_norms = np.zeros(curr_n_epochs,)
+        cooldown = 0
         for epoch in range(curr_n_epochs):
             model.train()
             permutation = torch.randperm(X.shape[0])
@@ -272,9 +273,24 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
               test_losses[epoch][current_voxels] = test_loss.detach().cpu()
             else:
               test_losses[epoch][current_voxels] = test_loss[current_voxels].detach().cpu()
+            del test_loss
             
+            if cooldown > 0:
+                if cooldown == cooldown_period:
+                    cooldown = 0
+                else:
+                    cooldown += 1
+            
+            prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
-            scheduler.step(sum_grad_norm)
+            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
+                optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
+                cooldown = 1
+            sum_grad_norms[epoch] = sum_grad_norm
+            # scheduler.step(sum_grad_norm)
+
+            if sum_grad_norm < min_sum_grad_norm:
+                break
 
         # Load checkpoint from previous epoch
         # model.load_state_dict(torch.load(checkpoint_path))
@@ -286,6 +302,9 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             final_preds = preds_test
         else:
             final_preds[:, current_voxels] = preds_test[:, current_voxels]
+        
+        del model
+        del sum_grad_norms
 
     del Xtest
     del Ytest
@@ -397,6 +416,9 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
             del preds_val
             del val_loss
+
+            if sum_grad_norm < min_sum_grad_norm:
+                break
 
         del model
         del sum_grad_norms

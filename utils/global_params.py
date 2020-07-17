@@ -16,6 +16,7 @@ allvoxels_minibatch_size = 128
 new_lr_window = 10
 cooldown_period = 15
 min_lr = 1e-8
+min_sum_grad_norm = 1e-15
 
 ###################################################################
 # Learning Rates for Different Models (Experimentally Determined) #
