@@ -216,13 +216,13 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, predict_feat_dict, lrs=lrs, no_regularization=no_regularization)
         preds = preds.detach().cpu().numpy()
 
-        os.makedirs(preds_dir, exist_ok=True)
-        os.makedirs(train_losses_dir, exist_ok=True)
-        os.makedirs(test_losses_dir, exist_ok=True)
+        # os.makedirs(preds_dir, exist_ok=True)
+        # os.makedirs(train_losses_dir, exist_ok=True)
+        # os.makedirs(test_losses_dir, exist_ok=True)
         
-        np.save(preds_path, preds)
-        np.save(train_losses_path, train_losses)
-        np.save(test_losses_path, test_losses)
+        # np.save(preds_path, preds)
+        # np.save(train_losses_path, train_losses)
+        # np.save(test_losses_path, test_losses)
         # preds: (N_test, 27905)
         mlp_time = tm.time() - s_t
         print("-> MLP Training Time for fold {}: {}s".format(ind_num, mlp_time))

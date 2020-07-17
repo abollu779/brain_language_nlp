@@ -313,8 +313,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     num_batches = X.shape[0]//minibatch_size
     
     for idx,lmbda in enumerate(lambdas):
-        lmbda = 1e-6
-        print("Lambda: {}".format(lmbda))
+        # lmbda = 1e-6
+        # print("Lambda: {}".format(lmbda))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
@@ -382,18 +382,18 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
             # scheduler.step(sum_grad_norm)
-            new_lr = optimizer.param_groups[0]['lr']
-            if new_lr != prev_lr:
-                print("Epoch: {}, LR: {}".format(epoch, new_lr))
+            # new_lr = optimizer.param_groups[0]['lr']
+            # if new_lr != prev_lr:
+            #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
 
-            if (epoch%50 == 0) or (epoch == curr_n_epochs-1):
-            # if (epoch == 0) or (epoch == curr_n_epochs-1):
-                # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
-                # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
-                print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
-                if epoch == curr_n_epochs-1:
-                    import pdb
-                    pdb.set_trace()
+            # if (epoch%50 == 0) or (epoch == curr_n_epochs-1):
+            # # if (epoch == 0) or (epoch == curr_n_epochs-1):
+            #     # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
+            #     # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
+            #     print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
+            #     if epoch == curr_n_epochs-1:
+            #         import pdb
+            #         pdb.set_trace()
 
             del preds_val
             del val_loss
@@ -440,14 +440,14 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
             print("========================")
         # Identify optimal lambda and use it to generate predictions
         argmin_lambda = np.argmin(r_cv, axis=0)
-        import matplotlib.pyplot as plt
-        plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
-        plt.xlim(0, 15)
-        plt.ylim(0,28000)
-        argmin_lambdas_dir = 'argmin_lambda_indices/'
-        os.makedirs(argmin_lambdas_dir, exist_ok=True)
-        plt.savefig('{}{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
-        np.save('{}{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
+        # import matplotlib.pyplot as plt
+        # plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
+        # plt.xlim(0, 15)
+        # plt.ylim(0,28000)
+        # argmin_lambdas_dir = 'argmin_lambda_indices/'
+        # os.makedirs(argmin_lambdas_dir, exist_ok=True)
+        # plt.savefig('{}{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
+        # np.save('{}{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
 
         opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
         preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
