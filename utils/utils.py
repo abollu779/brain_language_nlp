@@ -209,7 +209,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         else:
             lrs = sgd_reg_lrs[encoding_model]
 
-        if encoding_model in ['linear_gd', 'mlp_sharedhidden_gd']:
+        if encoding_model in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
             # normalize data once since we won't be dealing with minibatches in this case 
             train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, num_voxels)
             test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, num_voxels)

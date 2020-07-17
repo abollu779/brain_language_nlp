@@ -12,7 +12,7 @@ import os
 import matplotlib.pyplot as plt
 from collections import Counter
 
-from utils.global_params import n_splits, allvoxels_minibatch_size, lr_when_no_regularization, \
+from utils.global_params import n_splits, allvoxels_minibatch_size, forloop_minibatch_size, lr_when_no_regularization, \
                                 model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs, \
                                 new_lr_window, min_lr, cooldown_period, min_sum_grad_norm
 from utils.mlp_encoding_utils import MLPEncodingModel
@@ -193,7 +193,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xtest, Ytest = torch.from_numpy(Xtest).float(), torch.from_numpy(Ytest).float()
 
-    if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd']:
+    if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
         # normalize test data
         Xtest = normalize_torch_tensor(Xtest)
         Ytest = normalize_torch_tensor(Ytest)
@@ -237,7 +237,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
                 indices = permutation[i:i+minibatch_size]
                 batch_X, batch_Y = X[indices], Y[indices]
 
-                if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd']:
+                if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
                     # normalize batch data
                     batch_X = normalize_torch_tensor(batch_X)
                     batch_Y = normalize_torch_tensor(batch_Y)
@@ -318,7 +318,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xval, Yval = torch.from_numpy(Xval).float(), torch.from_numpy(Yval).float()
     
-    if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd']:
+    if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
         # normalize validation data
         Xval = normalize_torch_tensor(Xval)
         Yval = normalize_torch_tensor(Yval)
@@ -333,7 +333,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     
     for idx,lmbda in enumerate(lambdas):
         # lmbda = 1e-6
-        # print("Lambda: {}".format(lmbda))
+        print("Lambda: {}, LR: {}".format(lmbda, lrs[idx]))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
@@ -356,7 +356,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 indices = permutation[i:i+minibatch_size]
                 batch_X, batch_Y = X[indices], Y[indices]
 
-                if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd']:
+                if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
                     # normalize batch data
                     batch_X = normalize_torch_tensor(batch_X).to(device)
                     batch_Y = normalize_torch_tensor(batch_Y).to(device)
@@ -401,18 +401,18 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
             # scheduler.step(sum_grad_norm)
-            # new_lr = optimizer.param_groups[0]['lr']
-            # if new_lr != prev_lr:
-            #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
+            new_lr = optimizer.param_groups[0]['lr']
+            if new_lr != prev_lr:
+                print("Epoch: {}, LR: {}".format(epoch, new_lr))
 
-            # if (epoch%50 == 0) or (epoch == curr_n_epochs-1):
-            # # if (epoch == 0) or (epoch == curr_n_epochs-1):
-            #     # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
-            #     # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
-            #     print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
-            #     if epoch == curr_n_epochs-1:
-            #         import pdb
-            #         pdb.set_trace()
+            if (epoch%50 == 0) or (epoch == curr_n_epochs-1):
+            # if (epoch == 0) or (epoch == curr_n_epochs-1):
+                # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
+                # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
+                print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
+                if epoch == curr_n_epochs-1:
+                    import pdb
+                    pdb.set_trace()
 
             del preds_val
             del val_loss
@@ -491,7 +491,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     if encoding_model == 'linear_sgd':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [], num_voxels, allvoxels_minibatch_size
     if encoding_model == 'mlp_forloop':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16], 1, n_train//n_splits
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16], 1, forloop_minibatch_size
     elif encoding_model == 'mlp_smallerhiddensize':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [8], 1, n_train//n_splits
     elif encoding_model == 'mlp_largerhiddensize':
@@ -506,9 +506,13 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [], num_voxels, None
     elif encoding_model == 'mlp_sharedhidden_gd':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, None
+    elif encoding_model == 'mlp_forloop_gd':
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16], 1, None
+    elif encoding_model == 'mlp_separatehidden_gd':
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, None
     model_dict = dict(model_name=encoding_model, input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
-    if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd', 'mlp_sharedhidden_gd']:
+    if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd', 'mlp_sharedhidden_gd', 'mlp_separatehidden_gd']:
         # Train and predict for one voxel at a time
         preds = torch.zeros((num_voxels, n_test))
         train_losses = np.zeros((num_voxels, max_n_epochs))

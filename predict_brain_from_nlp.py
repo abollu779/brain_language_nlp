@@ -42,36 +42,40 @@ if __name__ == '__main__':
 
     # loading fMRI data
     data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
+    data = data[:, :5]
     # limit to ROI data
     if args.use_roi_voxels:
         rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
         data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
 
-    if args.encoding_model == 'mlp_separatehidden':
-        num_voxels = data.shape[1]
-        chunk_size = num_voxels//6
+    # if args.encoding_model == 'mlp_separatehidden':
+    #     num_voxels = data.shape[1]
+    #     chunk_size = num_voxels//6
 
-        corrs_t, preds_t, test_t, train_losses_t, test_losses_t = [], [], [], [], []
+    #     corrs_t, preds_t, test_t, train_losses_t, test_losses_t = [], [], [], [], []
 
-        for data_start in range(0, num_voxels, chunk_size):
-            data_chunk = data[:, data_start:data_start+chunk_size]
+    #     for data_start in range(0, num_voxels, chunk_size):
+    #         data_chunk = data[:, data_start:data_start+chunk_size]
 
-            corrs, preds, test, train_losses, test_losses = run_class_time_CV_fmri_crossval_ridge(data_chunk,
-                                                                            predict_feat_dict)
+    #         corrs, preds, test, train_losses, test_losses = run_class_time_CV_fmri_crossval_ridge(data_chunk,
+    #                                                                         predict_feat_dict)
             
-            corrs_t.append(corrs)
-            preds_t.append(preds)
-            test_t.append(test)
-            train_losses_t.append(train_losses)
-            test_losses_t.append(test_losses)
+    #         corrs_t.append(corrs)
+    #         preds_t.append(preds)
+    #         test_t.append(test)
+    #         train_losses_t.append(train_losses)
+    #         test_losses_t.append(test_losses)
         
-        corrs_t = np.concatenate(corrs_t, axis=1)
-        preds_t = np.concatenate(preds_t, axis=1)
-        test_t = np.concatenate(test_t, axis=1)
-        train_losses_t = np.stack(train_losses_t, axis=0)
-        test_losses_t = np.stack(test_losses_t, axis=0)
-    else:
-        corrs_t, preds_t, test_t, train_losses_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
+    #     corrs_t = np.concatenate(corrs_t, axis=1)
+    #     preds_t = np.concatenate(preds_t, axis=1)
+    #     test_t = np.concatenate(test_t, axis=1)
+    #     train_losses_t = np.stack(train_losses_t, axis=0)
+    #     test_losses_t = np.stack(test_losses_t, axis=0)
+    # else:
+    #     corrs_t, preds_t, test_t, train_losses_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
+    #                                                                         predict_feat_dict)
+
+    corrs_t, preds_t, test_t, train_losses_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
                                                                             predict_feat_dict)
 
 
