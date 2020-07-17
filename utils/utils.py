@@ -193,7 +193,7 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         preds = sklearn_cross_val_ridge_linear_sgd(train_features, train_data, test_features, test_data, no_regularization=no_regularization)
     else:
         if fold_output_dir is not None:
-            pred_dir = fold_output_dir
+            preds_dir = fold_output_dir
         else:
             vox_subdirname = 'roivoxels/' if use_roi_voxels else 'allvoxels/'
             preds_dir = '{}/mlp_fold_preds/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
