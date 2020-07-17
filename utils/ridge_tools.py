@@ -295,7 +295,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
 
             writer.add_scalar("Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
             writer.add_scalar("Lambda={}: Training Loss".format(lmbda), train_losses[idx, epoch], epoch)
-            writer.add_scalar("Lambda={}: Test Loss".format(lmbda), test_losses[idx, epoch], epoch)
+            if len(test_loss.shape) == 0:
+              writer.add_scalar("Lambda={}: Test Loss".format(lmbda), test_losses[idx, epoch], epoch)
+            else:
+              writer.add_histogram("Lambda={}: Test Loss".format(lmbda), test_losses[idx, epoch], epoch)
             writer.add_histogram("Lambda={}: layer0.weight".format(lmbda), model.model[0].weight, epoch)
             writer.add_histogram("Lambda={}: layer0.bias".format(lmbda), model.model[0].bias, epoch)
             writer.add_histogram("Lambda={}: layer2.weight".format(lmbda), model.model[2].weight, epoch)
@@ -436,7 +439,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
             writer.add_scalar("Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
             writer.add_scalar("Lambda={}: Training Loss".format(lmbda), epoch_losses[idx, epoch], epoch)
-            writer.add_scalar("Lambda={}: Validation Loss".format(lmbda), val_losses[idx, epoch], epoch)
+            writer.add_histogram("Lambda={}: Validation Loss".format(lmbda), val_losses[idx, epoch], epoch)
             writer.add_histogram("Lambda={}: layer0.weight".format(lmbda), model.model[0].weight, epoch)
             writer.add_histogram("Lambda={}: layer0.bias".format(lmbda), model.model[0].bias, epoch)
             writer.add_histogram("Lambda={}: layer2.weight".format(lmbda), model.model[2].weight, epoch)
