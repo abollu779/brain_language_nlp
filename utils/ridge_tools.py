@@ -300,20 +300,20 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             #     print("Epoch: {}, Sum Grad Norm: {}, Train Loss: {}, Test Loss: {}".format(epoch, sum_grad_norm, epoch_loss, None))
 
 
-            writer.add_scalar("Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
-            writer.add_scalar("Lambda={}: Training Loss".format(lmbda), train_losses[idx, epoch], epoch)
+            writer.add_scalar("Pred Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
+            writer.add_scalar("Pred Lambda={}: Training Loss".format(lmbda), train_losses[idx, epoch], epoch)
             if len(test_loss.shape) == 0:
-              writer.add_scalar("Lambda={}: Test Loss".format(lmbda), test_losses[idx, epoch], epoch)
+              writer.add_scalar("Pred Lambda={}: Test Loss".format(lmbda), test_losses[idx, epoch], epoch)
             else:
-              writer.add_histogram("Lambda={}: Test Loss".format(lmbda), test_losses[idx, epoch], epoch)
-            writer.add_histogram("Lambda={}: layer0.weight".format(lmbda), model.model[0].weight, epoch)
-            writer.add_histogram("Lambda={}: layer0.bias".format(lmbda), model.model[0].bias, epoch)
-            writer.add_histogram("Lambda={}: layer2.weight".format(lmbda), model.model[2].weight, epoch)
-            writer.add_histogram("Lambda={}: layer2.bias".format(lmbda), model.model[2].bias, epoch)
-            writer.add_histogram("Lambda={}: layer0.weight.grad".format(lmbda), model.model[0].weight.grad, epoch)
-            writer.add_histogram("Lambda={}: layer0.bias.grad".format(lmbda), model.model[0].bias.grad, epoch)
-            writer.add_histogram("Lambda={}: layer2.weight.grad".format(lmbda), model.model[2].weight.grad, epoch)
-            writer.add_histogram("Lambda={}: layer2.bias.grad".format(lmbda), model.model[2].bias.grad, epoch)
+              writer.add_histogram("Pred Lambda={}: Test Loss".format(lmbda), test_losses[idx, epoch], epoch)
+            writer.add_histogram("Pred Lambda={}: layer0.weight".format(lmbda), model.model[0].weight, epoch)
+            writer.add_histogram("Pred Lambda={}: layer0.bias".format(lmbda), model.model[0].bias, epoch)
+            writer.add_histogram("Pred Lambda={}: layer2.weight".format(lmbda), model.model[2].weight, epoch)
+            writer.add_histogram("Pred Lambda={}: layer2.bias".format(lmbda), model.model[2].bias, epoch)
+            writer.add_histogram("Pred Lambda={}: layer0.weight.grad".format(lmbda), model.model[0].weight.grad, epoch)
+            writer.add_histogram("Pred Lambda={}: layer0.bias.grad".format(lmbda), model.model[0].bias.grad, epoch)
+            writer.add_histogram("Pred Lambda={}: layer2.weight.grad".format(lmbda), model.model[2].weight.grad, epoch)
+            writer.add_histogram("Pred Lambda={}: layer2.bias.grad".format(lmbda), model.model[2].bias.grad, epoch)
 
             
             del preds_test
@@ -378,7 +378,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             model.model[2].weight.register_hook(zero_unused_gradients)
         
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
-        sum_grad_norms = np.zeros(curr_n_epochs,)
+        overall_val_losses = np.zeros(curr_n_epochs,)
+        # sum_grad_norms = np.zeros(curr_n_epochs,)
         cooldown = 0
         for epoch in range(curr_n_epochs):
             model.train()
@@ -417,6 +418,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             model.eval()
             preds_val = model(Xval)
             val_loss = 1 - R2_torch(preds_val.squeeze(), Yval)
+            overall_val_loss = criterion(preds_val.squeeze(), Yval)
 
             epoch_loss /= num_batches
             epoch_losses[idx, epoch] = epoch_loss
@@ -430,10 +432,14 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
 
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
-            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
+            # (linear_gd)
+            # if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
+            #     optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
+            #     cooldown = 1
+            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and overall_val_losses[epoch-new_lr_window] < overall_val_loss:
                 optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
                 cooldown = 1
-            sum_grad_norms[epoch] = sum_grad_norm
+            overall_val_losses[epoch] = overall_val_loss
             # scheduler.step(sum_grad_norm)
             new_lr = optimizer.param_groups[0]['lr']
             if new_lr != prev_lr:
@@ -444,21 +450,22 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
                 # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
                 print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
+                print("Training Loss: {}, Validation Loss: {}".format(epoch_loss, [overall_val_loss, val_loss.min().detach().cpu().item(), val_loss.max().detach().cpu().item(), val_loss.mean().detach().cpu().item()]))
                 if epoch == curr_n_epochs-1:
                     import pdb
                     pdb.set_trace()
 
-            writer.add_scalar("Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
-            writer.add_scalar("Lambda={}: Training Loss".format(lmbda), epoch_losses[idx, epoch], epoch)
-            writer.add_histogram("Lambda={}: Validation Loss".format(lmbda), val_losses[idx, epoch], epoch)
-            writer.add_histogram("Lambda={}: layer0.weight".format(lmbda), model.model[0].weight, epoch)
-            writer.add_histogram("Lambda={}: layer0.bias".format(lmbda), model.model[0].bias, epoch)
-            writer.add_histogram("Lambda={}: layer2.weight".format(lmbda), model.model[2].weight, epoch)
-            writer.add_histogram("Lambda={}: layer2.bias".format(lmbda), model.model[2].bias, epoch)
-            writer.add_histogram("Lambda={}: layer0.weight.grad".format(lmbda), model.model[0].weight.grad, epoch)
-            writer.add_histogram("Lambda={}: layer0.bias.grad".format(lmbda), model.model[0].bias.grad, epoch)
-            writer.add_histogram("Lambda={}: layer2.weight.grad".format(lmbda), model.model[2].weight.grad, epoch)
-            writer.add_histogram("Lambda={}: layer2.bias.grad".format(lmbda), model.model[2].bias.grad, epoch)
+            writer.add_scalar("Train Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
+            writer.add_scalar("Train Lambda={}: Training Loss".format(lmbda), epoch_losses[idx, epoch], epoch)
+            writer.add_histogram("Train Lambda={}: Validation Loss".format(lmbda), val_losses[idx, epoch], epoch)
+            writer.add_histogram("Train Lambda={}: layer0.weight".format(lmbda), model.model[0].weight, epoch)
+            writer.add_histogram("Train Lambda={}: layer0.bias".format(lmbda), model.model[0].bias, epoch)
+            writer.add_histogram("Train Lambda={}: layer2.weight".format(lmbda), model.model[2].weight, epoch)
+            writer.add_histogram("Train Lambda={}: layer2.bias".format(lmbda), model.model[2].bias, epoch)
+            writer.add_histogram("Train Lambda={}: layer0.weight.grad".format(lmbda), model.model[0].weight.grad, epoch)
+            writer.add_histogram("Train Lambda={}: layer0.bias.grad".format(lmbda), model.model[0].bias.grad, epoch)
+            writer.add_histogram("Train Lambda={}: layer2.weight.grad".format(lmbda), model.model[2].weight.grad, epoch)
+            writer.add_histogram("Train Lambda={}: layer2.bias.grad".format(lmbda), model.model[2].bias.grad, epoch)
 
             del preds_val
             del val_loss
@@ -467,7 +474,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 break
 
         del model
-        del sum_grad_norms
+        # del sum_grad_norms
+        del overall_val_losses
         writer.flush()
 
     # Collect last epoch's validation costs
