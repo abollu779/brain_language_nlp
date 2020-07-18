@@ -267,8 +267,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             model.eval()
             preds_test = model(Xtest)
             test_loss = criterion_test(preds_test.squeeze(), Ytest).mean(dim=0)
-            del preds_test
-
             # # Overwrite checkpoint
             # torch.save(model.state_dict(), checkpoint_path)
             epoch_loss /= num_batches
@@ -277,7 +275,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
               test_losses[epoch][current_voxels] = test_loss.detach().cpu()
             else:
               test_losses[epoch][current_voxels] = test_loss[current_voxels].detach().cpu()
-            del test_loss
             
             if cooldown > 0:
                 if cooldown == cooldown_period:
@@ -292,6 +289,16 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
                 cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
             # scheduler.step(sum_grad_norm)
+            # new_lr = optimizer.param_groups[0]['lr']
+            # if new_lr != prev_lr:
+            #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
+
+            # if (epoch%5 == 0) or (epoch == curr_n_epochs-1):
+            # # if (epoch == 0) or (epoch == curr_n_epochs-1):
+            #     # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
+            #     # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
+            #     print("Epoch: {}, Sum Grad Norm: {}, Train Loss: {}, Test Loss: {}".format(epoch, sum_grad_norm, epoch_loss, None))
+
 
             writer.add_scalar("Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
             writer.add_scalar("Lambda={}: Training Loss".format(lmbda), train_losses[idx, epoch], epoch)
@@ -307,6 +314,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             writer.add_histogram("Lambda={}: layer0.bias.grad".format(lmbda), model.model[0].bias.grad, epoch)
             writer.add_histogram("Lambda={}: layer2.weight.grad".format(lmbda), model.model[2].weight.grad, epoch)
             writer.add_histogram("Lambda={}: layer2.bias.grad".format(lmbda), model.model[2].bias.grad, epoch)
+
+            
+            del preds_test
+            del test_loss
 
             if sum_grad_norm < min_sum_grad_norm:
                 break
@@ -483,7 +494,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
 
     global writer
     if no_regularization:
-        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, np.array([0.] * num_voxels), np.array([lr_when_no_regularization] * num_voxels), n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
+        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, np.array([0.] * num_voxels), np.array([lrs] * num_voxels), n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
     else:
         kf = KFold(n_splits=n_splits)
         # Gather recorded costs from training with each lambda
