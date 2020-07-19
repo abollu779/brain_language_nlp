@@ -248,7 +248,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
                 batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
 
                 batch_preds = model(batch_X)
-                batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+                if minibatch_size != 1:
+                    batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+                else:
+                    batch_loss = criterion(batch_preds, batch_Y)
                 weights_squared_sum = 0.
                 for layer in model.model:
                     if isinstance(layer, nn.Linear):
@@ -378,8 +381,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             model.model[2].weight.register_hook(zero_unused_gradients)
         
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
-        overall_val_losses = np.zeros(curr_n_epochs,)
-        # sum_grad_norms = np.zeros(curr_n_epochs,)
+        # overall_val_losses = np.zeros(curr_n_epochs,)
+        sum_grad_norms = np.zeros(curr_n_epochs,)
         cooldown = 0
         for epoch in range(curr_n_epochs):
             model.train()
@@ -398,7 +401,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
 
                 batch_preds = model(batch_X)
-                batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+                if minibatch_size != 1:
+                    batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+                else:
+                    batch_loss = criterion(batch_preds, batch_Y)
                 weights_squared_sum = 0.
                 for layer in model.model:
                     if isinstance(layer, nn.Linear):
@@ -433,13 +439,15 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
             # (linear_gd)
-            # if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
-            #     optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
-            #     cooldown = 1
-            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and overall_val_losses[epoch-new_lr_window] < overall_val_loss:
+            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and \
+                sum_grad_norms[epoch-new_lr_window] < sum_grad_norm and epoch_losses[idx][epoch-new_lr_window] < epoch_loss:
                 optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
                 cooldown = 1
-            overall_val_losses[epoch] = overall_val_loss
+            sum_grad_norms[epoch] = sum_grad_norm
+            # if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and overall_val_losses[epoch-new_lr_window] < overall_val_loss:
+            #     optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
+            #     cooldown = 1
+            # overall_val_losses[epoch] = overall_val_loss
             # scheduler.step(sum_grad_norm)
             new_lr = optimizer.param_groups[0]['lr']
             if new_lr != prev_lr:
@@ -474,8 +482,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 break
 
         del model
-        # del sum_grad_norms
-        del overall_val_losses
+        del sum_grad_norms
+        # del overall_val_losses
         writer.flush()
 
     # Collect last epoch's validation costs

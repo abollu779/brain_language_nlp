@@ -12,7 +12,7 @@ encoding_model_options = ['linear', 'linear_sgd', 'mlp_separatehidden', 'mlp_sha
 n_splits = 10 # When training on each fold, train data is further split up into n_splits to compute model costs and pick an optimal lambda during ridge regression
 lr_when_no_regularization = 1e-3
 model_checkpoint_dir = 'model_checkpoints/'
-allvoxels_minibatch_size = 32 # 128 (linear_gd)
+allvoxels_minibatch_size = 1 # 128 (linear_gd)
 forloop_minibatch_size = 32
 new_lr_window = 10
 cooldown_period = 15
@@ -34,7 +34,7 @@ sgd_noreg_n_epochs = {'linear_sgd': 27,
 
 # With Regularization
 sgd_reg_lrs = {'linear_sgd': np.array([1e-3]*16),
-                'mlp_sharedhidden': np.array([1e-3]*16),
+                'mlp_sharedhidden': np.array([1e-4]*16),
                 # 'mlp_sharedhidden': np.array([1e-6]*3+[1e-5]+[1e-1]*4+[1e0]*8),
                 'mlp_separatehidden': np.array([1e-2]*16),
                 'mlp_forloop': np.array([1e-2]*16),
