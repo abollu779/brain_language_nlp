@@ -14,7 +14,7 @@ from collections import Counter
 
 from utils.global_params import n_splits, allvoxels_minibatch_size, forloop_minibatch_size, lr_when_no_regularization, \
                                 model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs, \
-                                new_lr_window, min_lr, cooldown_period, min_sum_grad_norm
+                                new_lr_window, min_lr, cooldown_period, min_sum_grad_norm, sharedhidden_minibatch_sizes
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 writer = SummaryWriter()
@@ -204,11 +204,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     Xtest, Ytest = Xtest.to(device), Ytest.to(device)
 
     train_losses, test_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((max_n_epochs, num_voxels))
-    if model_dict['minibatch_size'] is None:
-        minibatch_size = X.shape[0]
-    else:
-        minibatch_size = model_dict['minibatch_size']
-    num_batches = X.shape[0]//minibatch_size
     final_preds = torch.zeros_like(Ytest).to(device)
 
     for idx, (lmbda, lr) in enumerate(unique_lambdas_lrs):
@@ -221,6 +216,14 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
+
+        if model_dict['minibatch_size'] is None:
+            minibatch_size = X.shape[0]
+        elif type(model_dict['minibatch_size']) == list:
+            minibatch_size = model_dict['minibatch_size'][idx]
+        else:    
+            minibatch_size = model_dict['minibatch_size']
+        num_batches = X.shape[0]//minibatch_size
 
         # # Model checkpoint path
         # if not os.path.exists(model_checkpoint_dir):
@@ -287,12 +290,13 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
-            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
+            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and \
+                sum_grad_norms[epoch-new_lr_window] < sum_grad_norm and train_losses[idx][epoch-new_lr_window] < epoch_loss:
                 optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
                 cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
             # scheduler.step(sum_grad_norm)
-            # new_lr = optimizer.param_groups[0]['lr']
+            new_lr = optimizer.param_groups[0]['lr']
             # if new_lr != prev_lr:
             #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
 
@@ -322,7 +326,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             del preds_test
             del test_loss
 
-            if sum_grad_norm < min_sum_grad_norm:
+            if sum_grad_norm < min_sum_grad_norm or new_lr < min_lr:
                 break
 
         # Load checkpoint from previous epoch
@@ -362,15 +366,15 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     Xval, Yval = Xval.to(device), Yval.to(device)
 
     epoch_losses, val_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((num_lambdas, max_n_epochs, num_voxels))
-    if model_dict['minibatch_size'] is None:
-        minibatch_size = X.shape[0]
-    else:
-        minibatch_size = model_dict['minibatch_size']
-    num_batches = X.shape[0]//minibatch_size
+    # if model_dict['minibatch_size'] is None:
+    #     minibatch_size = X.shape[0]
+    # else:
+    #     minibatch_size = model_dict['minibatch_size']
+    # num_batches = X.shape[0]//minibatch_size
     
     for idx,lmbda in enumerate(lambdas):
         # lmbda = 1e-6
-        print("Lambda: {}, LR: {}".format(lmbda, lrs[idx]))
+        # print("Lambda: {}, LR: {}".format(lmbda, lrs[idx]))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
@@ -379,6 +383,14 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
+
+        if model_dict['minibatch_size'] is None:
+            minibatch_size = X.shape[0]
+        elif type(model_dict['minibatch_size']) == list:
+            minibatch_size = model_dict['minibatch_size'][idx]
+        else:    
+            minibatch_size = model_dict['minibatch_size']
+        num_batches = X.shape[0]//minibatch_size
         
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
         # overall_val_losses = np.zeros(curr_n_epochs,)
@@ -450,18 +462,17 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             # overall_val_losses[epoch] = overall_val_loss
             # scheduler.step(sum_grad_norm)
             new_lr = optimizer.param_groups[0]['lr']
-            if new_lr != prev_lr:
-                print("Epoch: {}, LR: {}".format(epoch, new_lr))
+            # if new_lr != prev_lr:
+            #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
 
-            if (epoch%50 == 0) or (epoch == curr_n_epochs-1):
-            # if (epoch == 0) or (epoch == curr_n_epochs-1):
-                # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
-                # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
-                print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
-                print("Training Loss: {}, Validation Loss: {}".format(epoch_loss, overall_val_loss.detach().cpu().item()))
-                if epoch == curr_n_epochs-1:
-                    import pdb
-                    pdb.set_trace()
+            # if (epoch%50 == 0) or (epoch == curr_n_epochs-1):
+            # # if (epoch == 0) or (epoch == curr_n_epochs-1):
+            #     # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
+            #     # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
+            #     print("Epoch: {}, GradNorm: {}, TLoss: {}, VLoss: {}".format(epoch, sum_grad_norm, epoch_loss, overall_val_loss.detach().cpu().item()))
+            #     # if epoch == curr_n_epochs-1:
+            #     #     import pdb
+            #     #     pdb.set_trace()
 
             writer.add_scalar("Train Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
             writer.add_scalar("Train Lambda={}: Training Loss".format(lmbda), epoch_losses[idx, epoch], epoch)
@@ -478,7 +489,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             del preds_val
             del val_loss
 
-            if sum_grad_norm < min_sum_grad_norm:
+            if sum_grad_norm < min_sum_grad_norm or new_lr < min_lr:
                 break
 
         del model
@@ -565,7 +576,9 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     elif encoding_model == 'mlp_separatehidden':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, allvoxels_minibatch_size
     elif encoding_model == 'mlp_sharedhidden':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, allvoxels_minibatch_size
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, sharedhidden_minibatch_sizes
+        if no_regularization:
+            minibatch_size = allvoxels_minibatch_size
     elif encoding_model == 'linear_gd':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [], num_voxels, None
     elif encoding_model == 'mlp_sharedhidden_gd':
