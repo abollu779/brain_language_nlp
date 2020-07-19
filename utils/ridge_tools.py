@@ -374,7 +374,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     
     for idx,lmbda in enumerate(lambdas):
         # lmbda = 1e-6
-        # print("Lambda: {}, LR: {}".format(lmbda, lrs[idx]))
+        print("Lambda: {}, LR: {}".format(lmbda, lrs[idx]))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
