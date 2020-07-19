@@ -436,8 +436,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             model.eval()
             preds_val = model(Xval)
             val_loss = 1 - R2_torch(preds_val.squeeze(), Yval)
-            overall_val_loss = criterion(preds_val.squeeze(), Yval)
-            train_loss = criterion(model(X).squeeze(), Y)
+            # overall_val_loss = criterion(preds_val.squeeze(), Yval)
+            # train_loss = criterion(model(X).squeeze(), Y)
 
             epoch_loss /= num_batches
             epoch_losses[idx, epoch] = epoch_loss
@@ -466,14 +466,14 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             # if new_lr != prev_lr:
             #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
 
-            if (epoch%5 == 0) or (epoch == curr_n_epochs-1):
-            # if (epoch == 0) or (epoch == curr_n_epochs-1):
-                # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
-                # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
-                print("Epoch: {}, GradNorm: {}, TLoss: {}, VLoss: {}".format(epoch, sum_grad_norm, train_loss, overall_val_loss.detach().cpu().item()))
-            #     # if epoch == curr_n_epochs-1:
-            #     #     import pdb
-            #     #     pdb.set_trace()
+            # if (epoch%5 == 0) or (epoch == curr_n_epochs-1):
+            # # if (epoch == 0) or (epoch == curr_n_epochs-1):
+            #     # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
+            #     # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
+            #     print("Epoch: {}, GradNorm: {}, TLoss: {}, VLoss: {}".format(epoch, sum_grad_norm, train_loss, overall_val_loss.detach().cpu().item()))
+            # #     # if epoch == curr_n_epochs-1:
+            # #     #     import pdb
+            # #     #     pdb.set_trace()
 
             writer.add_scalar("Train Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
             writer.add_scalar("Train Lambda={}: Training Loss".format(lmbda), epoch_losses[idx, epoch], epoch)
