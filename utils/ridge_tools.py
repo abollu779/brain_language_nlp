@@ -14,7 +14,8 @@ from collections import Counter
 
 from utils.global_params import n_splits, allvoxels_minibatch_size, forloop_minibatch_size, lr_when_no_regularization, \
                                 model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs, \
-                                new_lr_window, min_lr, cooldown_period, min_sum_grad_norm, sharedhidden_minibatch_sizes
+                                new_lr_window, min_lr, cooldown_period, min_sum_grad_norm, sharedhidden_minibatch_sizes, \
+                                    mlp_sharedhidden_onepredmodel_lr, mlp_sharedhidden_onepredmodel_num_epochs, mlp_sharedhidden_onepredmodel_minibatch_size
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 writer = SummaryWriter()
@@ -185,6 +186,121 @@ def normalize_torch_tensor(t):
     norm_t = torch.where(torch.isnan(norm_t), torch.zeros_like(norm_t), norm_t)
     return norm_t
 
+def pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, X, Y, Xtest, Ytest, opt_lambdas, best_roi_lambda, is_mlp_separatehidden=False):
+    global writer
+    assert(model_dict['model_name'] == 'mlp_sharedhidden_onepredmodel')
+
+    num_voxels = 1 if (len(Y.shape) == 1) else Y.shape[1]
+
+    X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
+    Xtest, Ytest = torch.from_numpy(Xtest).float(), torch.from_numpy(Ytest).float()
+
+    # normalize test data
+    Xtest = normalize_torch_tensor(Xtest)
+    Ytest = normalize_torch_tensor(Ytest)
+    Xtest, Ytest = Xtest.to(device), Ytest.to(device)
+
+    model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
+    model = model.to(device)
+    criterion = nn.MSELoss(reduction='mean')
+    criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
+    optimizer = optim.Adam(model.parameters(), lr=mlp_sharedhidden_onepredmodel_lr)
+
+    if model_dict['minibatch_size'] is None:
+        minibatch_size = X.shape[0]
+    else:    
+        minibatch_size = model_dict['minibatch_size']
+    num_batches = X.shape[0]//minibatch_size
+
+    curr_n_epochs = mlp_sharedhidden_onepredmodel_num_epochs
+    train_losses, test_losses = np.zeros((curr_n_epochs,)), np.zeros((curr_n_epochs, num_voxels))
+    sum_grad_norms = np.zeros(curr_n_epochs,)
+    cooldown = 0
+    for epoch in range(curr_n_epochs):
+        model.train()
+        permutation = torch.randperm(X.shape[0])
+        epoch_loss = 0
+        for i in range(0, X.shape[0], minibatch_size):
+            optimizer.zero_grad()
+
+            indices = permutation[i:i+minibatch_size]
+            batch_X, batch_Y = X[indices], Y[indices]
+
+            # normalize batch data
+            batch_X = normalize_torch_tensor(batch_X)
+            batch_Y = normalize_torch_tensor(batch_Y)
+            batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
+
+            batch_preds = model(batch_X)
+            batch_loss = criterion(batch_preds.squeeze(), batch_Y)
+
+            layer0_reg_term = best_roi_lambda * ((model.model[0].weight)**2).sum()
+            layer2_reg_term = torch.dot(opt_lambdas, (model.model[2].weight**2).sum(1))
+            batch_loss += (float(minibatch_size)/X.shape[0]) * (layer0_reg_term + layer2_reg_term)
+
+            batch_loss.backward()
+            optimizer.step()
+            epoch_loss += batch_loss.detach().cpu()
+
+            del batch_X
+            del batch_Y
+            del batch_preds
+            del batch_loss
+        
+        model.eval()
+        preds_test = model(Xtest)
+        test_loss = criterion_test(preds_test.squeeze(), Ytest).mean(dim=0)
+
+        epoch_loss /= num_batches
+        train_losses[epoch] = epoch_loss
+        test_losses[epoch]= test_loss.detach().cpu()
+        
+        if cooldown > 0:
+            if cooldown == cooldown_period:
+                cooldown = 0
+            else:
+                cooldown += 1
+        
+        prev_lr = optimizer.param_groups[0]['lr']
+        sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
+        if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
+            optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
+            cooldown = 1
+        sum_grad_norms[epoch] = sum_grad_norm
+        new_lr = optimizer.param_groups[0]['lr']
+
+        writer.add_scalar("Pred: Sum Grad Norm", sum_grad_norm, epoch)
+        writer.add_scalar("Pred: Training Loss", train_losses[epoch], epoch)
+        # if len(test_loss.shape) == 0:
+        #     writer.add_scalar("Pred: Test Loss", test_losses[epoch], epoch)
+        # else:
+        #     writer.add_histogram("Pred: Test Loss", test_losses[epoch], epoch)
+        writer.add_histogram("Pred: layer0.weight", model.model[0].weight, epoch)
+        writer.add_histogram("Pred: layer0.bias", model.model[0].bias, epoch)
+        writer.add_histogram("Pred: layer2.weight", model.model[2].weight, epoch)
+        writer.add_histogram("Pred: layer2.bias", model.model[2].bias, epoch)
+        writer.add_histogram("Pred: layer0.weight.grad", model.model[0].weight.grad, epoch)
+        writer.add_histogram("Pred: layer0.bias.grad", model.model[0].bias.grad, epoch)
+        writer.add_histogram("Pred: layer2.weight.grad", model.model[2].weight.grad, epoch)
+        writer.add_histogram("Pred: layer2.bias.grad", model.model[2].bias.grad, epoch)
+
+        del preds_test
+        del test_loss
+
+        if sum_grad_norm < min_sum_grad_norm:
+            break
+
+    # Generate predictions
+    model.eval()
+    preds_test = model(Xtest)
+    
+    del model
+    del sum_grad_norms
+    
+    writer.flush()
+    return preds_test, train_losses, test_losses
+
+    
 def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=False):
     global writer
 
@@ -310,10 +426,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
 
             writer.add_scalar("Pred Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
             writer.add_scalar("Pred Lambda={}: Training Loss".format(lmbda), train_losses[idx, epoch], epoch)
-            if len(test_loss.shape) == 0:
-              writer.add_scalar("Pred Lambda={}: Test Loss".format(lmbda), test_losses[idx, epoch], epoch)
-            else:
-              writer.add_histogram("Pred Lambda={}: Test Loss".format(lmbda), test_losses[idx, epoch], epoch)
+            # if len(test_loss.shape) == 0:
+            #   writer.add_scalar("Pred Lambda={}: Test Loss".format(lmbda), test_losses[epoch], epoch)
+            # else:
+            #   writer.add_histogram("Pred Lambda={}: Test Loss".format(lmbda), test_losses[epoch], epoch)
             writer.add_histogram("Pred Lambda={}: layer0.weight".format(lmbda), model.model[0].weight, epoch)
             writer.add_histogram("Pred Lambda={}: layer0.bias".format(lmbda), model.model[0].bias, epoch)
             writer.add_histogram("Pred Lambda={}: layer2.weight".format(lmbda), model.model[2].weight, epoch)
@@ -550,8 +666,18 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         plt.savefig('{}{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
         np.save('{}{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
 
-        opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
-        preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
+        if model_dict['model_name'] != 'mlp_sharedhidden_onepredmodel':
+            opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
+            preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
+        else:
+            if not predict_feat_dict['use_roi_voxels']:
+                rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
+                roi_voxels = np.where(rois.item()[predict_feat_dict['subject']]['all'] == 1)[0]
+                best_roi_lambda = Counter(argmin_lambda[roi_voxels]).most_common(1)[0][0]
+            else:
+                best_roi_lambda = Counter(argmin_lambda).most_common(1)[0][0]
+            opt_lambdas = lambdas[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
+            preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, best_roi_lambda, is_mlp_separatehidden=is_mlp_separatehidden)
     writer.close()
     return preds, train_losses, test_losses
 
@@ -592,6 +718,8 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16], 1, None
     elif encoding_model == 'mlp_separatehidden_gd':
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, None
+    elif encoding_model == 'mlp_sharedhidden_onepredmodel':
+        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, mlp_sharedhidden_onepredmodel_minibatch_size
     model_dict = dict(model_name=encoding_model, input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
     if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd', 'mlp_sharedhidden_gd', 'mlp_separatehidden_gd']:
