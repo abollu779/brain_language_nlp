@@ -245,7 +245,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
     ind = CV_ind(n_words, n_folds=n_folds)
     
     if single_fold_computation:
-        # assert encoding_model != 'linear'
+        assert encoding_model != 'linear'
         train_ind = ind!=fold_num
         test_ind = ind==fold_num
         corrs_d, preds_d, train_losses_d, test_losses_d, all_test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
