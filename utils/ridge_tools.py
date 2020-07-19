@@ -450,7 +450,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
                 # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
                 print("Epoch: {}, Sum Grad Norm: {}".format(epoch, sum_grad_norm))
-                print("Training Loss: {}, Validation Loss: {}".format(epoch_loss, [overall_val_loss, val_loss.min().detach().cpu().item(), val_loss.max().detach().cpu().item(), val_loss.mean().detach().cpu().item()]))
+                print("Training Loss: {}, Validation Loss: {}".format(epoch_loss, overall_val_loss.detach().cpu().item()))
                 if epoch == curr_n_epochs-1:
                     import pdb
                     pdb.set_trace()
