@@ -290,8 +290,9 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
-            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and \
-                sum_grad_norms[epoch-new_lr_window] < sum_grad_norm and train_losses[idx][epoch-new_lr_window] < epoch_loss:
+            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
+            # if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and \
+            #     sum_grad_norms[epoch-new_lr_window] < sum_grad_norm and train_losses[idx][epoch-new_lr_window] < epoch_loss:
                 optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
                 cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
@@ -326,7 +327,8 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             del preds_test
             del test_loss
 
-            if sum_grad_norm < min_sum_grad_norm or new_lr < min_lr:
+            if sum_grad_norm < min_sum_grad_norm:
+            # if sum_grad_norm < min_sum_grad_norm or new_lr < min_lr:
                 break
 
         # Load checkpoint from previous epoch
@@ -452,8 +454,9 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
             # (linear_gd)
-            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and \
-                sum_grad_norms[epoch-new_lr_window] < sum_grad_norm and epoch_losses[idx][epoch-new_lr_window] < epoch_loss:
+            if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
+            # if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and \
+            #     sum_grad_norms[epoch-new_lr_window] < sum_grad_norm and epoch_losses[idx][epoch-new_lr_window] < epoch_loss:
                 optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
                 cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
@@ -490,7 +493,8 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             del preds_val
             del val_loss
 
-            if sum_grad_norm < min_sum_grad_norm or new_lr < min_lr:
+            if sum_grad_norm < min_sum_grad_norm:
+            # if sum_grad_norm < min_sum_grad_norm or new_lr < min_lr:
                 break
 
         del model

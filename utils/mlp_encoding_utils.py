@@ -13,12 +13,12 @@ class MLPEncodingModel(nn.Module):
                         nn.ReLU(),
                         nn.Linear(hidden_sizes[1], output_size))
         elif len(hidden_sizes) == 1:
-            # self.model = nn.Sequential(nn.Linear(input_size, hidden_sizes[0]), 
-            #             nn.ReLU(), 
-            #             nn.Linear(hidden_sizes[0], output_size))
             self.model = nn.Sequential(nn.Linear(input_size, hidden_sizes[0]), 
-                        nn.LeakyReLU(), 
+                        nn.ReLU(), 
                         nn.Linear(hidden_sizes[0], output_size))
+            # self.model = nn.Sequential(nn.Linear(input_size, hidden_sizes[0]), 
+            #             nn.LeakyReLU(), 
+            #             nn.Linear(hidden_sizes[0], output_size))
             if is_mlp_separatehidden:
                 num_voxels = self.model[2].weight.shape[0]
                 linear2_weights = self.model[2].weight.detach().numpy() 
