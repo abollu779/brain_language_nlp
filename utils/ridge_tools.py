@@ -197,10 +197,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xtest, Ytest = torch.from_numpy(Xtest).float(), torch.from_numpy(Ytest).float()
 
-    # if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
-    #     # normalize test data
-    #     Xtest = normalize_torch_tensor(Xtest)
-    #     Ytest = normalize_torch_tensor(Ytest)
+    if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
+        # normalize test data
+        Xtest = normalize_torch_tensor(Xtest)
+        Ytest = normalize_torch_tensor(Ytest)
     Xtest, Ytest = Xtest.to(device), Ytest.to(device)
 
     train_losses, test_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((max_n_epochs, num_voxels))
@@ -244,10 +244,10 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
                 indices = permutation[i:i+minibatch_size]
                 batch_X, batch_Y = X[indices], Y[indices]
 
-                # if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
-                #     # normalize batch data
-                #     batch_X = normalize_torch_tensor(batch_X)
-                #     batch_Y = normalize_torch_tensor(batch_Y)
+                if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
+                    # normalize batch data
+                    batch_X = normalize_torch_tensor(batch_X)
+                    batch_Y = normalize_torch_tensor(batch_Y)
                 batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
 
                 batch_preds = model(batch_X)
@@ -359,10 +359,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xval, Yval = torch.from_numpy(Xval).float(), torch.from_numpy(Yval).float()
     
-    # if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
-    #     # normalize validation data
-    #     Xval = normalize_torch_tensor(Xval)
-    #     Yval = normalize_torch_tensor(Yval)
+    if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
+        # normalize validation data
+        Xval = normalize_torch_tensor(Xval)
+        Yval = normalize_torch_tensor(Yval)
     Xval, Yval = Xval.to(device), Yval.to(device)
 
     epoch_losses, val_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((num_lambdas, max_n_epochs, num_voxels))
@@ -406,10 +406,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 indices = permutation[i:i+minibatch_size]
                 batch_X, batch_Y = X[indices], Y[indices]
 
-                # if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
-                #     # normalize batch data
-                #     batch_X = normalize_torch_tensor(batch_X).to(device)
-                #     batch_Y = normalize_torch_tensor(batch_Y).to(device)
+                if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
+                    # normalize batch data
+                    batch_X = normalize_torch_tensor(batch_X).to(device)
+                    batch_Y = normalize_torch_tensor(batch_Y).to(device)
                 batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
 
                 batch_preds = model(batch_X)
