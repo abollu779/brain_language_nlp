@@ -215,7 +215,7 @@ def pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, 
     curr_n_epochs = mlp_sharedhidden_onepredmodel_num_epochs
     train_losses, test_losses = np.zeros((curr_n_epochs,)), np.zeros((curr_n_epochs, num_voxels))
     sum_grad_norms = np.zeros(curr_n_epochs,)
-    # cooldown = 0
+    cooldown = 0
     for epoch in range(curr_n_epochs):
         model.train()
         permutation = torch.randperm(X.shape[0])
@@ -255,19 +255,19 @@ def pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, 
         train_losses[epoch] = epoch_loss
         test_losses[epoch]= test_loss.detach().cpu()
         
-        # if cooldown > 0:
-        #     if cooldown == cooldown_period:
-        #         cooldown = 0
-        #     else:
-        #         cooldown += 1
+        if cooldown > 0:
+            if cooldown == cooldown_period:
+                cooldown = 0
+            else:
+                cooldown += 1
         
-        # prev_lr = optimizer.param_groups[0]['lr']
+        prev_lr = optimizer.param_groups[0]['lr']
         sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
-        # if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
-        #     optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
-        #     cooldown = 1
+        if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
+            optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
+            cooldown = 1
         sum_grad_norms[epoch] = sum_grad_norm
-        # new_lr = optimizer.param_groups[0]['lr']
+        new_lr = optimizer.param_groups[0]['lr']
 
         writer.add_scalar("Pred: Sum Grad Norm", sum_grad_norm, epoch)
         writer.add_scalar("Pred: Training Loss", train_losses[epoch], epoch)
