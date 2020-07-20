@@ -19,6 +19,7 @@ if __name__ == '__main__':
     parser.add_argument("--single-fold-computation", action='store_true')
     parser.add_argument("--fold-num", type=int, choices=[i for i in range(n_folds)])
     parser.add_argument("--no-regularization", action='store_true')
+    parser.add_argument("--on-colab", action='store_true')
     
     args = parser.parse_args()
 
@@ -37,7 +38,8 @@ if __name__ == '__main__':
                          'fold_num': args.fold_num,
                          'use_roi_voxels': args.use_roi_voxels,
                          'no_regularization': args.no_regularization,
-                         'fold_output_dir': args.fold_output_dir}
+                         'fold_output_dir': args.fold_output_dir,
+                         'on_colab': args.on_colab}
 
 
     # loading fMRI data
@@ -80,13 +82,16 @@ if __name__ == '__main__':
 
 
     if not args.single_fold_computation:
-        dirname = 'roivoxels/' if args.use_roi_voxels else 'maxvoxels/'
+        if args.on_colab:
+            dirname = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
+        else:
+            dirname = args.output_dir
+            dirname += 'roivoxels/' if args.use_roi_voxels else 'maxvoxels/'
+            os.makedirs(dirname, exist_ok=True)
         regularization_suffix = 'noreg' if args.no_regularization else 'reg'
         fname = 'predict_{}_with_{}_layer_{}_len_{}_encoder_{}_{}'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model, regularization_suffix)
-        print('saving: {}'.format(args.output_dir + dirname + fname))
+        print('saving: {}'.format(dirname + fname))
 
-        os.makedirs(args.output_dir + dirname, exist_ok=True)
-
-        np.save(args.output_dir + dirname + fname + '.npy', {'corrs_t':corrs_t,'preds_t':preds_t,'test_t':test_t,'train_losses_t':train_losses_t,'test_losses_t':test_losses_t})
+        np.save(dirname + fname + '.npy', {'corrs_t':corrs_t,'preds_t':preds_t,'test_t':test_t,'train_losses_t':train_losses_t,'test_losses_t':test_losses_t})
 
     
