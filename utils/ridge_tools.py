@@ -661,10 +661,13 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
         plt.xlim(0, 15)
         plt.ylim(0,28000)
-        argmin_lambdas_dir = 'argmin_lambda_indices/'
-        os.makedirs(argmin_lambdas_dir, exist_ok=True)
-        plt.savefig('{}{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
-        np.save('{}{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
+        if predict_feat_dict['on_colab']:
+            argmin_lambdas_dir = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
+        else:
+            argmin_lambdas_dir = 'argmin_lambda_indices/'
+            os.makedirs(argmin_lambdas_dir, exist_ok=True)
+        plt.savefig('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
+        np.save('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
 
         if model_dict['model_name'] != 'mlp_sharedhidden_onepredmodel':
             opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )

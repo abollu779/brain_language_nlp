@@ -192,11 +192,16 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
 
         preds = sklearn_cross_val_ridge_linear_sgd(train_features, train_data, test_features, test_data, no_regularization=no_regularization)
     else:
-        if fold_output_dir is not None:
-            preds_dir = fold_output_dir
+        if predict_feat_dict['on_colab']:
+            preds_dir = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
         else:
+            if fold_output_dir is not None:
+                preds_dir = fold_output_dir
+            else:
+                preds_dir = ''
             vox_subdirname = 'roivoxels/' if use_roi_voxels else 'allvoxels/'
-            preds_dir = '{}/mlp_fold_preds/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
+            preds_dir += '{}/mlp_fold_preds/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
+            os.makedirs(preds_dir, exist_ok=True)
         preds_path = preds_dir + 'fold_{}.npy'.format(ind_num)
         # train_losses_dir = '{}/mlp_fold_train_losses/subject_{}/{}/layer_{}/seqlen_{}/'.format(encoding_model, subject, vox_subdirname, layer, seq_len)
         # train_losses_path = train_losses_dir + 'fold_{}.npy'.format(ind_num)
@@ -220,7 +225,6 @@ def single_fold_run_class_time_CV_fmri_crossval_ridge(ind_num, train_ind, test_i
         preds, train_losses, test_losses = cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, predict_feat_dict, lrs=lrs, no_regularization=no_regularization)
         preds = preds.detach().cpu().numpy()
 
-        os.makedirs(preds_dir, exist_ok=True)
         # os.makedirs(train_losses_dir, exist_ok=True)
         # os.makedirs(test_losses_dir, exist_ok=True)
         
@@ -250,7 +254,12 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
         test_ind = ind==fold_num
         corrs_d, preds_d, train_losses_d, test_losses_d, all_test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
                                                                                                         data, predict_feat_dict)
-        fname = encoding_model + '/fold_{}.npy'
+        
+        if predict_feat_dict['on_colab']:
+            fname = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
+        else:
+            fname = ''
+        fname += encoding_model + '/fold_{}.npy'
         os.makedirs(encoding_model + '/', exist_ok=True)
         np.save(fname.format(fold_num), {'corrs_d':corrs_d,'preds_d':preds_d,'test_d':all_test_data,'train_losses_d':train_losses_d,'test_losses_t':test_losses_d})
     else:
