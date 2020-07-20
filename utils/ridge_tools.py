@@ -235,7 +235,7 @@ def pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, 
             batch_loss = criterion(batch_preds.squeeze(), batch_Y)
 
             layer0_reg_term = best_roi_lambda * ((model.model[0].weight)**2).sum()
-            layer2_reg_term = torch.dot(opt_lambdas, (model.model[2].weight**2).sum(1))
+            layer2_reg_term = torch.dot(torch.tensor(opt_lambdas).float().to(device), (model.model[2].weight**2).sum(1))
             batch_loss += (float(minibatch_size)/X.shape[0]) * (layer0_reg_term + layer2_reg_term)
 
             batch_loss.backward()
@@ -722,7 +722,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, mlp_sharedhidden_onepredmodel_minibatch_size
     model_dict = dict(model_name=encoding_model, input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
-    if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd', 'mlp_sharedhidden_gd', 'mlp_separatehidden_gd']:
+    if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd', 'mlp_sharedhidden_gd', 'mlp_separatehidden_gd', 'mlp_sharedhidden_onepredmodel']:
         # Train and predict for one voxel at a time
         preds = torch.zeros((num_voxels, n_test))
         train_losses = np.zeros((num_voxels, max_n_epochs))

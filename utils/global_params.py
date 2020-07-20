@@ -50,7 +50,7 @@ sgd_reg_lrs = {'linear_sgd': np.array([1e-3]*16),
                 'mlp_sharedhidden_gd': np.array([1e-1]*16),
                 'mlp_forloop_gd': np.array([1e-1]*16),
                 'mlp_separatehidden_gd': np.array([1e-1]*16),
-                'mlp_sharedhidden_onepredmodel': np.array([1e-3]*14)}
+                'mlp_sharedhidden_onepredmodel': np.array([1e-3]*16)}
 sgd_reg_n_epochs = {'linear_sgd': np.array([38]*16),
                     'mlp_sharedhidden': np.array([40]*16),
                     # 'mlp_sharedhidden': np.array([60]*4+[70]+[80]+[8]+[5]*2+[6]*4+[7]*3),
