@@ -673,9 +673,10 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
             if not predict_feat_dict['use_roi_voxels']:
                 rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
                 roi_voxels = np.where(rois.item()[predict_feat_dict['subject']]['all'] == 1)[0]
-                best_roi_lambda = Counter(argmin_lambda[roi_voxels]).most_common(1)[0][0]
+                best_roi_lambda_idx = Counter(argmin_lambda[roi_voxels]).most_common(1)[0][0]
             else:
-                best_roi_lambda = Counter(argmin_lambda).most_common(1)[0][0]
+                best_roi_lambda_idx = Counter(argmin_lambda).most_common(1)[0][0]
+            best_roi_lambda = lambdas[best_roi_lambda_idx]
             opt_lambdas = lambdas[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
             preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, best_roi_lambda, is_mlp_separatehidden=is_mlp_separatehidden)
     writer.close()
