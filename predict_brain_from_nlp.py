@@ -14,7 +14,7 @@ if __name__ == '__main__':
     parser.add_argument("--sequence-length", type=int, required=False)
     parser.add_argument("--encoding-model", default='linear', choices=encoding_model_options)
     parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--fold-output-dir", required=False, default=None)
+    parser.add_argument("--intermediate-output-dir", required=False, default=None)
     parser.add_argument("--use-roi-voxels", action='store_true')
     parser.add_argument("--single-fold-computation", action='store_true')
     parser.add_argument("--fold-num", type=int, choices=[i for i in range(n_folds)])
@@ -38,7 +38,7 @@ if __name__ == '__main__':
                          'fold_num': args.fold_num,
                          'use_roi_voxels': args.use_roi_voxels,
                          'no_regularization': args.no_regularization,
-                         'fold_output_dir': args.fold_output_dir,
+                         'intermediate_output_dir': args.intermediate_output_dir,
                          'on_colab': args.on_colab}
 
 

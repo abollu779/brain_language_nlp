@@ -664,7 +664,12 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         if predict_feat_dict['on_colab']:
             argmin_lambdas_dir = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
         else:
-            argmin_lambdas_dir = 'argmin_lambda_indices/'
+            intermediate_output_dir = predict_feat_dict['intermediate_output_dir']
+            if intermediate_output_dir is not None:
+                argmin_lambdas_dir = intermediate_output_dir
+            else:
+                argmin_lambdas_dir = ''
+            argmin_lambdas_dir += 'argmin_lambda_indices/'
             os.makedirs(argmin_lambdas_dir, exist_ok=True)
         plt.savefig('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
         np.save('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
