@@ -264,7 +264,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
             else:
                 fname = ''
         fname += encoding_model + '/fold_{}.npy'
-        os.makedirs(encoding_model + '/', exist_ok=True)
+        os.makedirs(intermediate_output_dir + encoding_model + '/', exist_ok=True)
         np.save(fname.format(fold_num), {'corrs_d':corrs_d,'preds_d':preds_d,'test_d':all_test_data,'train_losses_d':train_losses_d,'test_losses_t':test_losses_d})
     else:
         corrs_d = np.zeros((n_folds, n_voxels))
