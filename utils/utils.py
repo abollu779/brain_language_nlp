@@ -249,7 +249,7 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
     ind = CV_ind(n_words, n_folds=n_folds)
     
     if single_fold_computation:
-        assert encoding_model != 'linear'
+        # assert encoding_model != 'linear'
         train_ind = ind!=fold_num
         test_ind = ind==fold_num
         corrs_d, preds_d, train_losses_d, test_losses_d, all_test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
@@ -260,11 +260,11 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
         else:
             intermediate_output_dir = predict_feat_dict['intermediate_output_dir']
             if intermediate_output_dir is not None:
-                fname = intermediate_output_dir
+                dirname = intermediate_output_dir
             else:
-                fname = ''
-        fname += encoding_model + '/fold_{}.npy'
-        os.makedirs(intermediate_output_dir + encoding_model + '/', exist_ok=True)
+                dirname = ''
+        fname = dirname + encoding_model + '/fold_{}.npy'
+        os.makedirs(dirname + encoding_model + '/', exist_ok=True)
         np.save(fname.format(fold_num), {'corrs_d':corrs_d,'preds_d':preds_d,'test_d':all_test_data,'train_losses_d':train_losses_d,'test_losses_t':test_losses_d})
     else:
         corrs_d = np.zeros((n_folds, n_voxels))

@@ -44,7 +44,6 @@ if __name__ == '__main__':
 
     # loading fMRI data
     data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
-    # data = data[:, :5]
     # limit to ROI data
     if args.use_roi_voxels:
         rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
@@ -76,9 +75,6 @@ if __name__ == '__main__':
     else:
         corrs_t, preds_t, test_t, train_losses_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
                                                                             predict_feat_dict)
-
-    # corrs_t, preds_t, test_t, train_losses_t, test_losses_t = run_class_time_CV_fmri_crossval_ridge(data,
-    #                                                                         predict_feat_dict)
 
 
     if not args.single_fold_computation:
