@@ -496,7 +496,10 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     # num_batches = X.shape[0]//minibatch_size
     
     for idx,lmbda in enumerate(lambdas):
-        # lmbda = 1e-6
+        # TODO: Remove below hardcoded values, only temporary for comparing mlp_separatehidden to mlp_forloop
+        lmbda = 1e-2
+        lrs[idx] = 1e-2
+        # END TODO
         print("Lambda: {}, LR: {}".format(lmbda, lrs[idx]))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
