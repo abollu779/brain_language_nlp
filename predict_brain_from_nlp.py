@@ -44,12 +44,15 @@ if __name__ == '__main__':
 
     # loading fMRI data
     data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
+    # TODO: Remove below hardcoded values, only temporary for comparing mlp_separatehidden to mlp_forloop
+    data = data[:,:3]
+    # END TODO
     # limit to ROI data
     if args.use_roi_voxels:
         rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
         data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
 
-    if args.encoding_model == 'mlp_separatehidden':
+    if args.encoding_model == 'mlp_separatehidden' and not args.use_roi_voxels:
         num_voxels = data.shape[1]
         chunk_size = num_voxels//6
 

@@ -12,10 +12,9 @@ from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 from collections import Counter
 
-from utils.global_params import n_splits, allvoxels_minibatch_size, forloop_minibatch_size, lr_when_no_regularization, \
-                                model_checkpoint_dir, sgd_noreg_n_epochs, sgd_reg_n_epochs, \
-                                new_lr_window, min_lr, cooldown_period, min_sum_grad_norm, sharedhidden_minibatch_sizes, \
-                                    mlp_sharedhidden_onepredmodel_lr, mlp_sharedhidden_onepredmodel_num_epochs, mlp_sharedhidden_onepredmodel_minibatch_size
+from utils.global_params import n_splits, hidden_sizes, output_sizes, minibatch_sizes, \
+                                sgd_noreg_n_epochs, sgd_reg_n_epochs, \
+                                new_lr_window, min_lr, cooldown_period, min_sum_grad_norm
 from utils.mlp_encoding_utils import MLPEncodingModel
 
 writer = SummaryWriter()
@@ -186,7 +185,7 @@ def normalize_torch_tensor(t):
     norm_t = torch.where(torch.isnan(norm_t), torch.zeros_like(norm_t), norm_t)
     return norm_t
 
-def pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, X, Y, Xtest, Ytest, opt_lambdas, best_roi_lambda, is_mlp_separatehidden=False):
+def pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, X, Y, Xtest, Ytest, opt_lambdas, best_roi_lambda, best_roi_lr, best_roi_n_epochs, is_mlp_separatehidden=False):
     global writer
     model_name = model_dict['model_name']
     # assert(model_name in ['mlp_sharedhidden_onepredmodel', 'mlp_sharedhidden_onepredmodel_singlelambda'])
@@ -205,7 +204,7 @@ def pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, 
     model = model.to(device)
     criterion = nn.MSELoss(reduction='mean')
     criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
-    optimizer = optim.Adam(model.parameters(), lr=mlp_sharedhidden_onepredmodel_lr)
+    optimizer = optim.Adam(model.parameters(), lr=best_roi_lr)
 
     if model_dict['minibatch_size'] is None:
         minibatch_size = X.shape[0]
@@ -213,7 +212,7 @@ def pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, 
         minibatch_size = model_dict['minibatch_size']
     num_batches = X.shape[0]//minibatch_size
 
-    curr_n_epochs = mlp_sharedhidden_onepredmodel_num_epochs
+    curr_n_epochs = best_roi_n_epochs
     train_losses, test_losses = np.zeros((curr_n_epochs,)), np.zeros((curr_n_epochs, num_voxels))
     sum_grad_norms = np.zeros(curr_n_epochs,)
     cooldown = 0
@@ -333,23 +332,16 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
         criterion = nn.MSELoss(reduction='mean')
         criterion_test = nn.MSELoss(reduction='none') # store test squared errors for every voxel
         optimizer = optim.Adam(model.parameters(), lr=lr)
-        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+        
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
 
         if model_dict['minibatch_size'] is None:
             minibatch_size = X.shape[0]
-        elif type(model_dict['minibatch_size']) == list:
-            minibatch_size = model_dict['minibatch_size'][idx]
         else:    
             minibatch_size = model_dict['minibatch_size']
         num_batches = X.shape[0]//minibatch_size
-
-        # # Model checkpoint path
-        # if not os.path.exists(model_checkpoint_dir):
-        #     os.makedirs(model_checkpoint_dir)
-        # checkpoint_path = model_checkpoint_dir + 'checkpoint.pt'
     
         current_voxels = opt_lambdas == lmbda
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
@@ -372,10 +364,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
                 batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
 
                 batch_preds = model(batch_X)
-                if minibatch_size != 1:
-                    batch_loss = criterion(batch_preds.squeeze(), batch_Y)
-                else:
-                    batch_loss = criterion(batch_preds, batch_Y)
+                batch_loss = criterion(batch_preds.squeeze(), batch_Y)
                 weights_squared_sum = 0.
                 for layer in model.model:
                     if isinstance(layer, nn.Linear):
@@ -394,8 +383,6 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             model.eval()
             preds_test = model(Xtest)
             test_loss = criterion_test(preds_test.squeeze(), Ytest).mean(dim=0)
-            # # Overwrite checkpoint
-            # torch.save(model.state_dict(), checkpoint_path)
             epoch_loss /= num_batches
             train_losses[idx, epoch] = epoch_loss
             if len(test_loss.shape) == 0:
@@ -412,21 +399,15 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
             if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
-            # if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and \
-            #     sum_grad_norms[epoch-new_lr_window] < sum_grad_norm and train_losses[idx][epoch-new_lr_window] < epoch_loss:
                 optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
                 cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
-            # scheduler.step(sum_grad_norm)
             new_lr = optimizer.param_groups[0]['lr']
-            # if new_lr != prev_lr:
-            #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
+            if new_lr != prev_lr:
+                print("Epoch: {}, LR: {}".format(epoch, new_lr))
 
-            # if (epoch%5 == 0) or (epoch == curr_n_epochs-1):
-            # # if (epoch == 0) or (epoch == curr_n_epochs-1):
-            #     # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
-            #     # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
-            #     print("Epoch: {}, Sum Grad Norm: {}, Train Loss: {}, Test Loss: {}".format(epoch, sum_grad_norm, epoch_loss, None))
+            if (epoch%5 == 0) or (epoch == curr_n_epochs-1):
+                print("Epoch: {}, Sum Grad Norm: {}, Train Loss: {}, Test Loss: {}".format(epoch, sum_grad_norm, epoch_loss, None))
 
 
             writer.add_scalar("Pred Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
@@ -449,11 +430,7 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
             del test_loss
 
             if sum_grad_norm < min_sum_grad_norm:
-            # if sum_grad_norm < min_sum_grad_norm or new_lr < min_lr:
                 break
-
-        # Load checkpoint from previous epoch
-        # model.load_state_dict(torch.load(checkpoint_path))
     
         # Generate predictions
         model.eval()
@@ -482,6 +459,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     X, Y = torch.from_numpy(X).float(), torch.from_numpy(Y).float()
     Xval, Yval = torch.from_numpy(Xval).float(), torch.from_numpy(Yval).float()
     
+    # For gradient descent models, data is already normalized outside this function
     if model_dict['model_name'] not in ['linear_gd', 'mlp_sharedhidden_gd', 'mlp_forloop_gd', 'mlp_separatehidden_gd']:
         # normalize validation data
         Xval = normalize_torch_tensor(Xval)
@@ -489,11 +467,6 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     Xval, Yval = Xval.to(device), Yval.to(device)
 
     epoch_losses, val_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((num_lambdas, max_n_epochs, num_voxels))
-    # if model_dict['minibatch_size'] is None:
-    #     minibatch_size = X.shape[0]
-    # else:
-    #     minibatch_size = model_dict['minibatch_size']
-    # num_batches = X.shape[0]//minibatch_size
     
     for idx,lmbda in enumerate(lambdas):
         # TODO: Remove below hardcoded values, only temporary for comparing mlp_separatehidden to mlp_forloop
@@ -505,21 +478,18 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
         optimizer = optim.Adam(model.parameters(), lr=lrs[idx])
-        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+
         if is_mlp_separatehidden:
             # Register backward hook function for second layer's weights tensor
             model.model[2].weight.register_hook(zero_unused_gradients)
 
         if model_dict['minibatch_size'] is None:
             minibatch_size = X.shape[0]
-        elif type(model_dict['minibatch_size']) == list:
-            minibatch_size = model_dict['minibatch_size'][idx]
         else:    
             minibatch_size = model_dict['minibatch_size']
         num_batches = X.shape[0]//minibatch_size
         
         curr_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs[idx]
-        # overall_val_losses = np.zeros(curr_n_epochs,)
         sum_grad_norms = np.zeros(curr_n_epochs,)
         cooldown = 0
         for epoch in range(curr_n_epochs):
@@ -539,10 +509,7 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
                 batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
 
                 batch_preds = model(batch_X)
-                if minibatch_size != 1:
-                    batch_loss = criterion(batch_preds.squeeze(), batch_Y)
-                else:
-                    batch_loss = criterion(batch_preds, batch_Y)
+                batch_loss = criterion(batch_preds.squeeze(), batch_Y)
                 weights_squared_sum = 0.
                 for layer in model.model:
                     if isinstance(layer, nn.Linear):
@@ -568,39 +535,30 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             epoch_losses[idx, epoch] = epoch_loss
             val_losses[idx, epoch] = val_loss.detach().cpu()
 
+            # Scheduler
             if cooldown > 0:
                 if cooldown == cooldown_period:
                     cooldown = 0
                 else:
                     cooldown += 1
-
             prev_lr = optimizer.param_groups[0]['lr']
             sum_grad_norm = torch.abs(model.model[0].weight.grad).sum()
-            # (linear_gd)
             if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and sum_grad_norms[epoch-new_lr_window] < sum_grad_norm:
-            # if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and \
-            #     sum_grad_norms[epoch-new_lr_window] < sum_grad_norm and epoch_losses[idx][epoch-new_lr_window] < epoch_loss:
                 optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
                 cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
-            # if epoch > new_lr_window and cooldown == 0 and prev_lr > min_lr and overall_val_losses[epoch-new_lr_window] < overall_val_loss:
-            #     optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr']/10.
-            #     cooldown = 1
-            # overall_val_losses[epoch] = overall_val_loss
-            # scheduler.step(sum_grad_norm)
             new_lr = optimizer.param_groups[0]['lr']
-            # if new_lr != prev_lr:
-            #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
 
+            # Printing information of interest after epoch
+            if new_lr != prev_lr:
+                print("Epoch: {}, LR: {}".format(epoch, new_lr))
             if (epoch%10 == 0) or (epoch == curr_n_epochs-1):
-            # if (epoch == 0) or (epoch == curr_n_epochs-1):
-                # print("Lambda: {}, Epoch: {}".format(lmbda, epoch))
-                # print("Grad Norms: {}".format(torch.abs(model.model[0].weight.grad)))
                 print("Epoch: {}, GradNorm: {}, TLoss: {}, VLoss: {}".format(epoch, sum_grad_norm, epoch_loss, overall_val_loss.detach().cpu().item()))
-            #     # if epoch == curr_n_epochs-1:
-            #     #     import pdb
-            #     #     pdb.set_trace()
+                if epoch == curr_n_epochs-1:
+                    import pdb
+                    pdb.set_trace()
 
+            # Tensorboard logging
             writer.add_scalar("Train Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
             writer.add_scalar("Train Lambda={}: Training Loss".format(lmbda), epoch_losses[idx, epoch], epoch)
             writer.add_histogram("Train Lambda={}: Validation Loss".format(lmbda), val_losses[idx, epoch], epoch)
@@ -617,25 +575,17 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             del val_loss
 
             if sum_grad_norm < min_sum_grad_norm:
-            # if sum_grad_norm < min_sum_grad_norm or new_lr < min_lr:
                 break
 
         del model
         del sum_grad_norms
-        # del overall_val_losses
         writer.flush()
 
-    # Collect last epoch's validation costs
+    # Collect final epoch's validation costs
     cost = []
     for (lmbda_idx, epochs_spent_training) in enumerate(n_epochs):
         cost.append(val_losses[lmbda_idx, epochs_spent_training-1])
     cost = np.array(cost) # (num_lambdas, num_voxels)
-
-    # import os
-    # epoch_losses_path, val_losses_path = 'mlp_losses/train_split{}.npy'.format(split), 'mlp_losses/val_split{}.npy'.format(split)
-    # os.makedirs('mlp_losses/', exist_ok=True)
-    # np.save(epoch_losses_path, epoch_losses)
-    # np.save(val_losses_path, val_losses)
     
     del Xval
     del Yval
@@ -649,20 +599,23 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
 
     global writer
     if no_regularization:
+        # Train prediction model with lambda=0, lr=0
         preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, np.array([0.] * num_voxels), np.array([lrs] * num_voxels), n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
     else:
+
         kf = KFold(n_splits=n_splits)
         # Gather recorded costs from training with each lambda
         for ind_num, (trn, val) in enumerate(kf.split(train_Y)):
             start_t = time.time()
             print("======= Split {} =======".format(ind_num))
-
             cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs, ind_num, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden) # cost: (num_lambdas, )
             r_cv += cost
             end_t = time.time()
             print("Time Elapsed: {}s".format(end_t - start_t))
             print("========================")
-        # Identify optimal lambda and use it to generate predictions
+
+        
+        # Select optimal lambda(s), store them and generate lambda plots
         argmin_lambda = np.argmin(r_cv, axis=0)
         import matplotlib.pyplot as plt
         plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
@@ -681,11 +634,9 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         plt.savefig('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
         np.save('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
 
-        # argmin_lambda = np.load('/Users/murali/Downloads/lambdas_mlp_sharedhidden_roivoxels_withscheduler_difflambdas_threesplits_fold0.npy', allow_pickle=True)
-        if model_dict['model_name'] not in ['mlp_sharedhidden_onepredmodel', 'mlp_sharedhidden_onepredmodel_singlelambda']:
-            opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
-            preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
-        else:
+
+        # Generate predictions, either by training a single prediction model, or multiple models to cover different lambdas
+        if model_dict['model_name'] in ['mlp_sharedhidden_onepredmodel', 'mlp_sharedhidden_onepredmodel_singlelambda']:
             if not predict_feat_dict['use_roi_voxels']:
                 rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
                 roi_voxels = np.where(rois.item()[predict_feat_dict['subject']]['all'] == 1)[0]
@@ -693,8 +644,15 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
             else:
                 best_roi_lambda_idx = Counter(argmin_lambda).most_common(1)[0][0]
             best_roi_lambda = lambdas[best_roi_lambda_idx]
-            opt_lambdas = lambdas[argmin_lambda] # opt_lambdas, opt_lrs (num_voxels, )
-            preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, best_roi_lambda, is_mlp_separatehidden=is_mlp_separatehidden)
+            best_roi_lr = lrs[best_roi_lambda_idx]
+            best_roi_n_epochs = n_epochs[best_roi_lambda_idx]
+            opt_lambdas = lambdas[argmin_lambda]
+            preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent_mlp_sharedhidden_onepredmodel(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, best_roi_lambda, best_roi_lr, best_roi_n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
+        else:
+            opt_lambdas, opt_lrs = lambdas[argmin_lambda], lrs[argmin_lambda] 
+            preds, train_losses, test_losses = pred_ridge_by_lambda_grad_descent(model_dict, train_X, train_Y, test_X, test_Y, opt_lambdas, opt_lrs, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden)
+            
+    # End tensorboard logging
     writer.close()
     return preds, train_losses, test_losses
 
@@ -711,36 +669,14 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     max_n_epochs = n_epochs if (type(n_epochs) == int) else n_epochs.max()
 
     # Initialize appropriate encoding model
-    if encoding_model == 'linear_sgd':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [], num_voxels, allvoxels_minibatch_size
-    if encoding_model == 'mlp_forloop':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16], 1, forloop_minibatch_size
-    elif encoding_model == 'mlp_smallerhiddensize':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [8], 1, n_train//n_splits
-    elif encoding_model == 'mlp_largerhiddensize':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [24], 1, n_train//n_splits
-    elif encoding_model == 'mlp_additionalhiddenlayer':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16,4], 1, n_train//n_splits
-    elif encoding_model == 'mlp_separatehidden':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, allvoxels_minibatch_size
-    elif encoding_model == 'mlp_sharedhidden':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, sharedhidden_minibatch_sizes
-        if no_regularization:
-            minibatch_size = allvoxels_minibatch_size
-    elif encoding_model == 'linear_gd':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [], num_voxels, None
-    elif encoding_model == 'mlp_sharedhidden_gd':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, None
-    elif encoding_model == 'mlp_forloop_gd':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16], 1, None
-    elif encoding_model == 'mlp_separatehidden_gd':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [16*num_voxels], num_voxels, None
-    elif encoding_model == 'mlp_sharedhidden_onepredmodel' or encoding_model == 'mlp_sharedhidden_onepredmodel_singlelambda':
-        input_size, hidden_sizes, output_size, minibatch_size = feat_dim, [640], num_voxels, mlp_sharedhidden_onepredmodel_minibatch_size
+    is_hidden_multiplier, hidden_dims, hidden_multiplier = hidden_sizes[encoding_model]
+    input_size = feat_dim
+    hidden_size = [hidden_multiplier*num_voxels] if is_hidden_multiplier else hidden_dims
+    output_size = num_voxels if (output_sizes[encoding_model] is None) else output_sizes[encoding_model]
+    minibatch_size = minibatch_sizes[encoding_model]
     model_dict = dict(model_name=encoding_model, input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
 
-    if encoding_model not in ['linear_sgd', 'mlp_separatehidden', 'mlp_sharedhidden', 'linear_gd', 'mlp_sharedhidden_gd', 'mlp_separatehidden_gd', \
-                                                                    'mlp_sharedhidden_onepredmodel', 'mlp_sharedhidden_onepredmodel_singlelambda']:
+    if output_size == 1:
         # Train and predict for one voxel at a time
         preds = torch.zeros((num_voxels, n_test))
         train_losses = np.zeros((num_voxels, max_n_epochs))
@@ -751,7 +687,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
             vox_preds, vox_train_losses, vox_test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data[:, ivox],
                                                                                         test_features, test_data[:, ivox], lambdas, lrs, n_epochs, predict_feat_dict, no_regularization=no_regularization)
             
-            # Store predictions and model losses
+            # Collect predictions and model losses
             preds[ivox] = vox_preds.squeeze()
             train_losses[ivox] = vox_train_losses
             test_losses[ivox] = vox_test_losses
