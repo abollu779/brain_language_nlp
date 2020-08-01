@@ -25,13 +25,13 @@ min_sum_grad_norm = 1e-15
 sgd_noreg_lrs = {'linear_sgd': 1e-3,
                 'mlp_sharedhidden': 1e-2,
                 'mlp_separatehidden': 1e-3,
-                'mlp_sharedhidden_onepredmodel': mlp_sharedhidden_onepredmodel_lr,
-                'mlp_sharedhidden_onepredmodel_singlelambda': mlp_sharedhidden_onepredmodel_lr}
+                'mlp_sharedhidden_onepredmodel': 1e-3,
+                'mlp_sharedhidden_onepredmodel_singlelambda': 1e-3}
 sgd_noreg_n_epochs = {'linear_sgd': 27,
                     'mlp_sharedhidden': 169,
                     'mlp_separatehidden': 20,
-                    'mlp_sharedhidden_onepredmodel': mlp_sharedhidden_onepredmodel_num_epochs,
-                    'mlp_sharedhidden_onepredmodel_singlelambda': mlp_sharedhidden_onepredmodel_num_epochs}
+                    'mlp_sharedhidden_onepredmodel': 40,
+                    'mlp_sharedhidden_onepredmodel_singlelambda': 40}
 
 # With Regularization
 sgd_reg_lrs = {'linear_sgd': np.array([1e-3]*16),
