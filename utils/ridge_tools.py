@@ -674,7 +674,7 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
     hidden_size = [hidden_multiplier*num_voxels] if is_hidden_multiplier else hidden_dims
     output_size = num_voxels if (output_sizes[encoding_model] is None) else output_sizes[encoding_model]
     minibatch_size = minibatch_sizes[encoding_model]
-    model_dict = dict(model_name=encoding_model, input_size=input_size, hidden_sizes=hidden_sizes, output_size=output_size, minibatch_size=minibatch_size)
+    model_dict = dict(model_name=encoding_model, input_size=input_size, hidden_sizes=hidden_size, output_size=output_size, minibatch_size=minibatch_size)
 
     if output_size == 1:
         # Train and predict for one voxel at a time
