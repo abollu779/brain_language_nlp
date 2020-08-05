@@ -23,7 +23,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 
 np.random.seed(0)
-torch.manual_seed(0)
+# torch.manual_seed(0)
 
 def corr(X,Y):
     return np.mean(zscore(X)*zscore(Y),0)
@@ -403,11 +403,11 @@ def pred_ridge_by_lambda_grad_descent(model_dict, X, Y, Xtest, Ytest, opt_lambda
                 cooldown = 1
             sum_grad_norms[epoch] = sum_grad_norm
             new_lr = optimizer.param_groups[0]['lr']
-            if new_lr != prev_lr:
-                print("Epoch: {}, LR: {}".format(epoch, new_lr))
+            # if new_lr != prev_lr:
+            #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
 
-            if (epoch%5 == 0) or (epoch == curr_n_epochs-1):
-                print("Epoch: {}, Sum Grad Norm: {}, Train Loss: {}, Test Loss: {}".format(epoch, sum_grad_norm, epoch_loss, None))
+            # if (epoch%5 == 0) or (epoch == curr_n_epochs-1):
+            #     print("Epoch: {}, Sum Grad Norm: {}, Train Loss: {}, Test Loss: {}".format(epoch, sum_grad_norm, epoch_loss, None))
 
 
             writer.add_scalar("Pred Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
@@ -469,11 +469,11 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
     epoch_losses, val_losses = np.zeros((num_lambdas, max_n_epochs)), np.zeros((num_lambdas, max_n_epochs, num_voxels))
     
     for idx,lmbda in enumerate(lambdas):
-        # TODO: Remove below hardcoded values, only temporary for comparing mlp_separatehidden to mlp_forloop
-        lmbda = 1e-2
-        lrs[idx] = 1e-2
-        # END TODO
-        print("Lambda: {}, LR: {}".format(lmbda, lrs[idx]))
+        # # TODO: Remove below hardcoded values, only temporary for comparing mlp_separatehidden to mlp_forloop
+        # lmbda = 1e-2
+        # lrs[idx] = 1e-2
+        # # END TODO
+        # print("Lambda: {}, LR: {}".format(lmbda, lrs[idx]))
         model = MLPEncodingModel(model_dict['input_size'], model_dict['hidden_sizes'], model_dict['output_size'], is_mlp_separatehidden)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
@@ -550,13 +550,13 @@ def ridge_by_lambda_grad_descent(model_dict, X, Y, Xval, Yval, lambdas, lrs, spl
             new_lr = optimizer.param_groups[0]['lr']
 
             # Printing information of interest after epoch
-            if new_lr != prev_lr:
-                print("Epoch: {}, LR: {}".format(epoch, new_lr))
-            if (epoch%10 == 0) or (epoch == curr_n_epochs-1):
-                print("Epoch: {}, GradNorm: {}, TLoss: {}, VLoss: {}".format(epoch, sum_grad_norm, epoch_loss, overall_val_loss.detach().cpu().item()))
-                if epoch == curr_n_epochs-1:
-                    import pdb
-                    pdb.set_trace()
+            # if new_lr != prev_lr:
+            #     print("Epoch: {}, LR: {}".format(epoch, new_lr))
+            # if (epoch%10 == 0) or (epoch == curr_n_epochs-1):
+            #     print("Epoch: {}, GradNorm: {}, TLoss: {}, VLoss: {}".format(epoch, sum_grad_norm, epoch_loss, overall_val_loss.detach().cpu().item()))
+            #     if epoch == curr_n_epochs-1:
+            #         import pdb
+            #         pdb.set_trace()
 
             # Tensorboard logging
             writer.add_scalar("Train Lambda={}: Sum Grad Norm".format(lmbda), sum_grad_norm, epoch)
@@ -606,34 +606,33 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
         kf = KFold(n_splits=n_splits)
         # Gather recorded costs from training with each lambda
         for ind_num, (trn, val) in enumerate(kf.split(train_Y)):
-            start_t = time.time()
-            print("======= Split {} =======".format(ind_num))
+            # start_t = time.time()
+            # print("======= Split {} =======".format(ind_num))
             cost = ridge_by_lambda_grad_descent(model_dict, train_X[trn], train_Y[trn], train_X[val], train_Y[val], lambdas, lrs, ind_num, n_epochs, is_mlp_separatehidden=is_mlp_separatehidden) # cost: (num_lambdas, )
             r_cv += cost
-            end_t = time.time()
-            print("Time Elapsed: {}s".format(end_t - start_t))
-            print("========================")
+            # end_t = time.time()
+            # print("Time Elapsed: {}s".format(end_t - start_t))
+            # print("========================")
 
         
         # Select optimal lambda(s), store them and generate lambda plots
         argmin_lambda = np.argmin(r_cv, axis=0)
-        import matplotlib.pyplot as plt
-        plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
-        plt.xlim(0, 15)
-        plt.ylim(0,28000)
-        if predict_feat_dict['on_colab']:
-            argmin_lambdas_dir = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
-        else:
-            intermediate_output_dir = predict_feat_dict['intermediate_output_dir']
-            if intermediate_output_dir is not None:
-                argmin_lambdas_dir = intermediate_output_dir
-            else:
-                argmin_lambdas_dir = ''
-            argmin_lambdas_dir += 'argmin_lambda_indices/'
-            os.makedirs(argmin_lambdas_dir, exist_ok=True)
-        plt.savefig('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
-        np.save('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
-
+        # import matplotlib.pyplot as plt
+        # plt.bar(Counter(argmin_lambda).keys(), Counter(argmin_lambda).values(), 1, color='g')
+        # plt.xlim(0, 15)
+        # plt.ylim(0,28000)
+        # if predict_feat_dict['on_colab']:
+        #     argmin_lambdas_dir = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
+        # else:
+        #     intermediate_output_dir = predict_feat_dict['intermediate_output_dir']
+        #     if intermediate_output_dir is not None:
+        #         argmin_lambdas_dir = intermediate_output_dir
+        #     else:
+        #         argmin_lambdas_dir = ''
+        #     argmin_lambdas_dir += 'argmin_lambda_indices/'
+        #     os.makedirs(argmin_lambdas_dir, exist_ok=True)
+        # plt.savefig('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
+        # np.save('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambda)
 
         # Generate predictions, either by training a single prediction model, or multiple models to cover different lambdas
         if model_dict['model_name'] in ['mlp_sharedhidden_onepredmodel', 'mlp_sharedhidden_onepredmodel_singlelambda']:
@@ -654,7 +653,7 @@ def cross_val_ridge_mlp_train_and_predict(model_dict, train_X, train_Y, test_X, 
             
     # End tensorboard logging
     writer.close()
-    return preds, train_losses, test_losses
+    return preds, train_losses, test_losses, argmin_lambda
 
 def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_features, test_data, predict_feat_dict,
                         lambdas=np.array([10**i for i in range(-6,10)]), lrs=np.array([1e-3]*16),
@@ -681,24 +680,43 @@ def cross_val_ridge_mlp(encoding_model, train_features, train_data, test_feature
         preds = torch.zeros((num_voxels, n_test))
         train_losses = np.zeros((num_voxels, max_n_epochs))
         test_losses = np.zeros((num_voxels, max_n_epochs))
+        argmin_lambdas = np.zeros((num_voxels,))
 
         start_t = time.time()
         for ivox in range(num_voxels):
-            vox_preds, vox_train_losses, vox_test_losses = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data[:, ivox],
+            vox_preds, vox_train_losses, vox_test_losses, argmin_lambda = cross_val_ridge_mlp_train_and_predict(model_dict, train_features, train_data[:, ivox],
                                                                                         test_features, test_data[:, ivox], lambdas, lrs, n_epochs, predict_feat_dict, no_regularization=no_regularization)
             
             # Collect predictions and model losses
             preds[ivox] = vox_preds.squeeze()
             train_losses[ivox] = vox_train_losses
-            test_losses[ivox] = vox_test_losses
+            test_losses[ivox] = vox_test_losses.T
+            argmin_lambdas[ivox] = argmin_lambda
 
-            if (ivox % 1000 == 0):
+            if (ivox % 10 == 0):
                 end_t = time.time()
                 print("{} vox: {}s".format(ivox, end_t - start_t))
                 start_t = end_t
         preds = preds.T
         # preds: (N_test, num_voxels)
         # train_losses, test_losses: (num_voxels, max_n_epochs)
+
+        import matplotlib.pyplot as plt
+        plt.bar(Counter(argmin_lambdas).keys(), Counter(argmin_lambdas).values(), 1, color='g')
+        plt.xlim(0, 15)
+        plt.ylim(0,900)
+        if predict_feat_dict['on_colab']:
+            argmin_lambdas_dir = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
+        else:
+            intermediate_output_dir = predict_feat_dict['intermediate_output_dir']
+            if intermediate_output_dir is not None:
+                argmin_lambdas_dir = intermediate_output_dir
+            else:
+                argmin_lambdas_dir = ''
+            argmin_lambdas_dir += 'argmin_lambda_indices/'
+            os.makedirs(argmin_lambdas_dir, exist_ok=True)
+        plt.savefig('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.png'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']))
+        np.save('{}lambdas_{}_sub{}-layer{}-len{}_fold{}.npy'.format(argmin_lambdas_dir, model_dict['model_name'], predict_feat_dict['subject'], predict_feat_dict['layer'], predict_feat_dict['seq_len'], predict_feat_dict['fold_num']), argmin_lambdas)
     else:
         is_mlp_separatehidden = (encoding_model == 'mlp_separatehidden')
         # Train and predict for all voxels at once

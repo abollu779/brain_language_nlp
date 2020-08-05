@@ -47,10 +47,14 @@ if __name__ == '__main__':
     # limit to ROI data
     if args.use_roi_voxels:
         rois = np.load('../HP_subj_roi_inds.npy', allow_pickle=True)
-        data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
-    # TODO: Remove below hardcoded values, only temporary for comparing mlp_separatehidden to mlp_forloop
-    data = data[:,:3]
-    # END TODO
+        # TODO: Temporary change to run mlp_forloop on dmpfc region voxels
+        # data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
+        data = data[:, np.where(rois.item()[args.subject]['dmpfc'] == 1)[0]]
+        # END TODO
+
+    # # TODO: Remove below hardcoded values, only temporary for comparing mlp_separatehidden to mlp_forloop
+    # data = data[:,:3]
+    # # END TODO
 
     if args.encoding_model == 'mlp_separatehidden' and not args.use_roi_voxels:
         num_voxels = data.shape[1]
