@@ -23,7 +23,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device: ", device)
 
 np.random.seed(0)
-# torch.manual_seed(0)
+torch.manual_seed(0)
 
 def corr(X,Y):
     return np.mean(zscore(X)*zscore(Y),0)
