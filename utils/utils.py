@@ -255,8 +255,12 @@ def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict):
         corrs_d, preds_d, train_losses_d, test_losses_d, all_test_data = single_fold_run_class_time_CV_fmri_crossval_ridge(fold_num, train_ind, test_ind, 
                                                                                                         data, predict_feat_dict)
         
+        # TODO: Remove debugging statement below
+        import pdb
+        pdb.set_trace()
+        # END TODO
         if predict_feat_dict['on_colab']:
-            fname = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
+            dirname = '/content/mnt/My Drive/Research/Colab Dynamic Files/'
         else:
             intermediate_output_dir = predict_feat_dict['intermediate_output_dir']
             if intermediate_output_dir is not None:
