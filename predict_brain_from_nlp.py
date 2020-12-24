@@ -4,6 +4,8 @@ import numpy as np
 from utils.utils import run_class_time_CV_fmri_crossval_ridge
     
 if __name__ == '__main__':
+    np.random.seed(0)
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", required=True)
     parser.add_argument("--nlp_feat_type", required=True)

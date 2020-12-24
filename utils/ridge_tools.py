@@ -5,6 +5,9 @@ from sklearn.linear_model import Ridge, RidgeCV
 import time
 from scipy.stats import zscore
 
+################################################
+#              Linear Encoding Model           #
+################################################
 def corr(X,Y):
     return np.mean(zscore(X)*zscore(Y),0)
 
@@ -135,3 +138,8 @@ def cross_val_ridge(train_features,train_data, n_splits = 10,
         plt.imshow(weights,aspect='auto',cmap = 'RdBu_r',vmin = -0.5,vmax = 0.5);
 
     return weights, np.array([lambdas[i] for i in argmin_lambda])
+
+
+################################################
+#            Nonlinear Encoding Model          #
+################################################

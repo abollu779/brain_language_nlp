@@ -1,5 +1,5 @@
-from allennlp.commands.elmo import ElmoEmbedder
-from allennlp.data.tokenizers.word_tokenizer import WordTokenizer
+# from allennlp.commands.elmo import ElmoEmbedder
+# from allennlp.data.tokenizers.word_tokenizer import WordTokenizer
 
 import numpy as np
 import torch

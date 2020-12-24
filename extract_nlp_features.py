@@ -20,6 +20,8 @@ def save_layer_representations(model_layer_dict, model_name, seq_len, save_dir):
 model_options = ['bert','transformer_xl','elmo','use']        
 
 if __name__ == '__main__':
+    np.random.seed(0)
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--nlp_model", default='bert', choices=model_options)                
     parser.add_argument("--sequence_length", type=int, default=1, help='length of context to provide to NLP model (default: 1)')
