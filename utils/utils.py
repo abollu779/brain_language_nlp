@@ -1,14 +1,14 @@
 import numpy as np
 from sklearn.decomposition import PCA
 from scipy.stats import zscore
-import time
 import csv
 import os
 import nibabel
 from sklearn.metrics.pairwise import euclidean_distances
 from scipy.ndimage.filters import gaussian_filter
 
-from utils.ridge_tools import cross_val_ridge, corr
+from utils.ridge_tools import corr, cross_val_ridge_linear, cross_val_ridge_nonlinear
+from utils.global_params import n_folds, lambdas
 import time as tm
 
     
@@ -118,85 +118,85 @@ def prepare_fmri_features(train_features, test_features, word_train_indicator, T
     tmp = np.vstack([zscore(tmp[runs==i][20:-15]) for i in range(1,5)])
     tmp = np.nan_to_num(tmp)
         
-    return tmp[TR_train_indicator], tmp[~TR_train_indicator]
+    return tmp[TR_train_indicator], tmp[~TR_train_indicator] 
 
-  
-
-def run_class_time_CV_fmri_crossval_ridge(data, predict_feat_dict,
-                                          regress_feat_names_list = [],method = 'kernel_ridge', 
-                                          lambdas = np.array([0.1,1,10,100,1000]),
-                                          detrend = False, n_folds = 4, skip=5):
+def fold_run_class_time_CV_fmri_crossval_ridge(fold_num, data, args_dict, train_ind, test_ind, fold_preds_dir,
+                                        method = 'kernel_ridge', skip=5):
+    start_time = tm.time()
+    fold_preds_path = fold_preds_dir + 'fold{}_predictions.npy'.format(fold_num)
+    try:
+        fold_preds = np.load(fold_preds_path)
+    except IOError:
+        encoding_model, layer, seq_len, nlp_feat_type, feat_dir, use_ridge = args_dict['encoding_model'], args_dict['layer'], \
+                                                                             args_dict['seq_len'], args_dict['nlp_feat_type'], \
+                                                                             args_dict['feat_dir'], args_dict['use_ridge']
     
-    nlp_feat_type = predict_feat_dict['nlp_feat_type']
-    feat_dir = predict_feat_dict['nlp_feat_dir']
-    layer = predict_feat_dict['layer']
-    seq_len = predict_feat_dict['seq_len']
-        
-        
-    n_words = data.shape[0]
-    n_voxels = data.shape[1]
-
-    ind = CV_ind(n_words, n_folds=n_folds)
-
-    corrs = np.zeros((n_folds, n_voxels))
-    acc = np.zeros((n_folds, n_voxels))
-    acc_std = np.zeros((n_folds, n_voxels))
-
-    all_test_data = []
-    all_preds = []
-    
-    
-    for ind_num in range(n_folds):
-        train_ind = ind!=ind_num
-        test_ind = ind==ind_num
-        
         word_CV_ind = TR_to_word_CV_ind(train_ind)
-        
         _,_,tmp_train_features,tmp_test_features = get_nlp_features_fixed_length(layer, seq_len, nlp_feat_type, feat_dir, word_CV_ind)
         train_features,test_features = prepare_fmri_features(tmp_train_features, tmp_test_features, word_CV_ind, train_ind)
-        
-        # split data
-        train_data = data[train_ind]
-        test_data = data[test_ind]
 
+        train_data, test_data = data[train_ind], data[test_ind]
         # skip TRs between train and test data
-        if ind_num == 0: # just remove from front end
+        if fold_num==0: # just remove from front end
             train_data = train_data[skip:,:]
             train_features = train_features[skip:,:]
-        elif ind_num == n_folds-1: # just remove from back end
+        elif fold_num==n_folds-1: # just remove from back end
             train_data = train_data[:-skip,:]
             train_features = train_features[:-skip,:]
         else:
-            test_data = test_data[skip:-skip,:]
-            test_features = test_features[skip:-skip,:]
-
-        # normalize data
-        train_data = np.nan_to_num(zscore(np.nan_to_num(train_data)))
-        test_data = np.nan_to_num(zscore(np.nan_to_num(test_data)))
-        all_test_data.append(test_data)
+            train_data = train_data[skip:-skip,:]
+            train_features = train_features[skip:-skip,:]
         
-        train_features = np.nan_to_num(zscore(train_features))
-        test_features = np.nan_to_num(zscore(test_features)) 
-        
-        start_time = tm.time()
-        weights, chosen_lambdas = cross_val_ridge(train_features,train_data, n_splits = 10, lambdas = np.array([10**i for i in range(-6,10)]), method = 'plain',do_plot = False)
+        if encoding_model=='linear':
+            # normalize data outside for linear
+            train_features = np.nan_to_num(zscore(train_features)) # (N_train, feat_dim)
+            test_features = np.nan_to_num(zscore(test_features)) # (N_test, feat_dim)
+            train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, n_voxels)
+            test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, n_voxels)
 
-        preds = np.dot(test_features, weights)
-        corrs[ind_num,:] = corr(preds,test_data)
-        all_preds.append(preds)
-            
-        print('fold {} completed, took {} seconds'.format(ind_num, tm.time()-start_time))
-        del weights
+            weights, chosen_lambdas = cross_val_ridge_linear(train_features, train_data, use_ridge, method='plain')
+            fold_preds = np.dot(test_features, weights)
+            del weights # (feat_dim, n_voxels)
+        else:
+            fold_preds = cross_val_ridge_nonlinear(args_dict, train_features, train_data, test_features, test_data)
+            fold_preds = fold_preds.detach().cpu().numpy()
+        np.save(fold_preds_path, fold_preds)
+    fold_corrs = corr(fold_preds, test_data)
+    print('fold {} completed, took {} seconds'.format(fold_num, tm.time()-start_time))
+    return fold_corrs, fold_preds, test_data
 
-    return corrs, acc, acc_std, np.vstack(all_preds), np.vstack(all_test_data)
+def run_class_time_CV_fmri_crossval_ridge(data, args_dict):
+    fold_num = args_dict['fold_num']
+
+    n_words, n_voxels = data.shape
+    ind = CV_ind(n_words, n_folds=n_folds)
+
+    fold_preds_dir = args_dict['output_dir'] + 'fold_outputs/'
+    os.makedirs(fold_preds_dir, exist_ok=True)
+
+    if fold_num is not None:
+        train_ind, test_ind = (ind!=fold_num), (ind==fold_num)
+        corrs, preds, test_data = fold_run_class_time_CV_fmri_crossval_ridge(fold_num, data, args_dict, train_ind, test_ind, fold_preds_dir)
+    else:
+        corrs = np.zeros((n_folds, n_voxels))
+        preds = np.zeros((n_words, n_voxels))
+        test_data = []
+
+        for fold_num in range(n_folds):
+            train_ind, test_ind = (ind!=fold_num), (ind==fold_num)
+            fold_corrs, fold_preds, fold_test_data = fold_run_class_time_CV_fmri_crossval_ridge(fold_num, data, args_dict, train_ind, test_ind, fold_preds_dir)
+            corrs[fold_num,:], preds[test_ind] = fold_corrs, fold_preds
+            test_data.append(fold_test_data)
+        test_data = np.vstack(test_data)
+    return corrs, preds, test_data
 
 def binary_classify_without_neighborhoods(Ypred, Y, n_class=20, nSample=1000):
-    # Y: num_timesteps x num_voxels
-    num_timesteps, num_voxels = Y.shape
-    acc = np.zeros(num_voxels)
+    # Y: n_words x n_voxels
+    n_words, n_voxels = Y.shape
+    acc = np.zeros(n_voxels)
 
     for idx in range(nSample):
-        random_indices = np.random.choice(num_timesteps, n_class*2, replace=False)
+        random_indices = np.random.choice(n_words, n_class*2, replace=False)
         correct_indices, incorrect_indices = random_indices[:n_class], random_indices[n_class:]
         sample_real = Y[correct_indices]
         sample_pred_correct = Ypred[correct_indices]
