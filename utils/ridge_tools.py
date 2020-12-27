@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 import math
 
-from utils.global_params import lambdas, lrs, n_splits, n_epochs, model_dicts
+from utils.global_params import lambdas, lrs, n_splits, n_epochs
 from utils.nonlinear_utils import NonlinearEncodingModel
 
 torch.manual_seed(0)
@@ -186,6 +186,7 @@ def predict_ridge_by_lambda_graddescent(args_dict, X, Y, Xtest, Ytest, opt_lambd
 
             batch_preds = model(Xbatch)
             batch_loss = criterion(batch_preds.squeeze(), Ybatch)
+            weights_squared_sum = 0.
             for layer in model.model:
                 if isinstance(layer, nn.Linear):
                     weights_squared_sum += ((layer.weight)**2).sum()
@@ -199,11 +200,11 @@ def predict_ridge_by_lambda_graddescent(args_dict, X, Y, Xtest, Ytest, opt_lambd
         # Monitor test cost
         model.eval()
         test_preds = model(Xtest)
-        test_cost = (1. - R2_torch(test_preds.squeeze(), Ytest)).detach().cpu() # test_cost: (n_voxels, )
+        test_cost = (1. - R2_torch(test_preds.squeeze(), Ytest)).detach().cpu().numpy() # test_cost: (n_voxels, )
 
         # Tensorboard logging
-        writer.add_histogram('Prediction | Cost/train', train_cost, epoch)
-        writer.add_histogram('Prediction | Cost/test', test_cost, epoch)
+        writer.add_histogram('Prediction/Train Cost', train_cost, epoch)
+        writer.add_histogram('Prediction/Test Cost', test_cost, epoch)
         del test_preds
     
     # Generate predictions
@@ -214,7 +215,7 @@ def predict_ridge_by_lambda_graddescent(args_dict, X, Y, Xtest, Ytest, opt_lambd
     del model, Xtest, Ytest
     return test_preds
     
-def ridge_by_lambda_graddescent(args_dict, X, Y, Xval, Yval):
+def ridge_by_lambda_graddescent(split_num, args_dict, X, Y, Xval, Yval):
     global writer
     train_size, feat_dim, n_voxels = X.shape[0], X.shape[1], Y.shape[1]
     encoding_model, batch_size = args_dict['encoding_model'], args_dict['batch_size']
@@ -229,6 +230,7 @@ def ridge_by_lambda_graddescent(args_dict, X, Y, Xval, Yval):
 
     costs = []
     for idx, lmbda in enumerate(lambdas):
+        start = time.time()
         model = NonlinearEncodingModel(encoding_model, feat_dim, n_voxels)
         model = model.to(device)
         criterion = nn.MSELoss(reduction='mean')
@@ -263,11 +265,11 @@ def ridge_by_lambda_graddescent(args_dict, X, Y, Xval, Yval):
             # Monitor validation cost
             model.eval()
             val_preds = model(Xval)
-            val_cost = (1. - R2_torch(val_preds.squeeze(), Yval)).detach().cpu() # val_cost: (n_voxels, )
+            val_cost = (1. - R2_torch(val_preds.squeeze(), Yval)).detach().cpu().numpy() # val_cost: (n_voxels, )
 
             # Tensorboard logging
-            writer.add_histogram('Lambda={} | Cost/train', train_cost, epoch)
-            writer.add_histogram('Lambda={} | Cost/val', val_cost, epoch)
+            writer.add_histogram('Lambda={}/Train Cost/Split={}'.format(lmbda, split_num), train_cost, epoch)
+            writer.add_histogram('Lambda={}/Val Cost/Split={}'.format(lmbda, split_num), val_cost, epoch)
             del val_preds
         del model
         writer.flush()
@@ -277,7 +279,7 @@ def ridge_by_lambda_graddescent(args_dict, X, Y, Xval, Yval):
     del Xval, Yval
     return costs
 
-def cross_val_ridge_nonlinear(args_dict, train_features, train_data, test_features, test_data):
+def cross_val_ridge_nonlinear(fold_num, args_dict, train_features, train_data, test_features, test_data):
     import utils.utils as general_utils # Import here to avoid circular import error
     global writer
     encoding_model, use_ridge = args_dict['encoding_model'], args_dict['use_ridge']
@@ -286,19 +288,28 @@ def cross_val_ridge_nonlinear(args_dict, train_features, train_data, test_featur
     ind = general_utils.CV_ind(n_words, n_folds=n_splits)
 
     if use_ridge:
+        # Gathering costs across splits
         for split_num in range(n_splits):
+            start_time = time.time()
             train_ind, val_ind = (ind!=split_num), (ind==split_num)
 
-            costs = ridge_by_lambda_graddescent(args_dict, train_features[train_ind], train_data[train_ind], train_features[val_ind], train_data[val_ind])
+            costs = ridge_by_lambda_graddescent(split_num, args_dict, train_features[train_ind], train_data[train_ind], train_features[val_ind], train_data[val_ind])
             costs_across_splits += costs
+            print("Split: {} | Time: {}s".format(split_num, time.time() - start_time))
+        for idx, lmbda in enumerate(lambdas):
+            writer.add_histogram('Lambda={}/Total Val Cost'.format(lmbda), costs_across_splits[idx], 0)
+        writer.flush()
+
+        # Choosing a lambda based on total val cost data for ROI voxels
         argmin_lambda = np.argmin(costs_across_splits,axis = 0)
         if args_dict['roi_only']:
+            roi_lambdas = Counter(argmin_lambda)            
+        else:
             rois = np.load('./data/HP_subj_roi_inds.npy', allow_pickle=True)
             roi_voxels = np.where(rois.item()[args_dict['subject']]['all'] == 1)[0]
-            most_common_idx = Counter(argmin_lambda[roi_voxels]).most_common(1)[0][0]
-        else:
-            most_common_idx = Counter(argmin_lambda).most_common(1)[0][0]
-
+            roi_lambdas = argmin_lambda[roi_voxels]
+        print("ROI Lambda Counts:\n", roi_lambdas)
+        most_common_idx = Counter(roi_lambdas).most_common(1)[0][0]
         if encoding_model=='nonlinear_sharedhidden':
             opt_lambda, opt_lr = lambdas[most_common_idx], lrs[most_common_idx]
         elif encoding_model=='nonlinear_separatehidden':
@@ -307,6 +318,8 @@ def cross_val_ridge_nonlinear(args_dict, train_features, train_data, test_featur
             raise Exception('{} encoding model not recognized'.format(encoding_model))
     else:
         opt_lambda, opt_lr = 0., 1e-4
+
+    # Generating predictions with the chosen lambda
     preds = predict_ridge_by_lambda_graddescent(args_dict, train_features, train_data, test_features, test_data, opt_lambda, opt_lr)
 
     # End tensorboard logging

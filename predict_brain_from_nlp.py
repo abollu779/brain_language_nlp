@@ -25,12 +25,13 @@ if __name__ == '__main__':
 
     output_dirname = args.output_dir
     output_dirname += 'roi_voxels/' if args.roi_only else 'all_voxels/'
-    ridge_suffix = '' if args.use_ridge else 'noridge'
-    output_dirname += 'subject{}_{}_layer{}_len{}_encoder{}_{}/'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model, ridge_suffix)
+    ridge_suffix = '' if args.use_ridge else '_noridge'
+    output_dirname += 'subject{}_{}_layer{}_len{}_{}{}/'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model, ridge_suffix)
     os.makedirs(output_dirname, exist_ok=True)
 
     args_dict = {'nlp_feat_type':args.nlp_feat_type,
                 'nlp_feat_dir':args.nlp_feat_dir,
+                'subject':args.subject,
                 'layer':args.layer,
                 'seq_len':args.sequence_length,
                 'encoding_model':args.encoding_model,
