@@ -25,8 +25,9 @@ if __name__ == '__main__':
 
     output_dirname = args.output_dir
     output_dirname += 'roi_voxels/' if args.roi_only else 'all_voxels/'
-    ridge_suffix = '' if args.use_ridge else '_noridge'
-    output_dirname += 'subject{}_{}_layer{}_len{}_{}{}/'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model, ridge_suffix)
+    ridge_str = '' if args.use_ridge else '_noridge'
+    batch_size_str = 'nobatch' if (args.batch_size is None) else 'batch{}'.format(args.batch_size)
+    output_dirname += 'subject{}_{}_layer{}_len{}_{}{}_{}/'.format(args.subject, args.nlp_feat_type, args.layer, args.sequence_length, args.encoding_model, ridge_str, batch_size_str)
     os.makedirs(output_dirname, exist_ok=True)
 
     args_dict = {'nlp_feat_type':args.nlp_feat_type,

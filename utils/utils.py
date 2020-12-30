@@ -129,9 +129,9 @@ def fold_run_class_time_CV_fmri_crossval_ridge(fold_num, data, args_dict, train_
     if os.path.isfile(fold_preds_path):
         fold_preds = np.load(fold_preds_path)
     else:
-        encoding_model, layer, seq_len, nlp_feat_type, feat_dir, use_ridge = args_dict['encoding_model'], args_dict['layer'], \
+        encoding_model, layer, seq_len, nlp_feat_type, feat_dir = args_dict['encoding_model'], args_dict['layer'], \
                                                                              args_dict['seq_len'], args_dict['nlp_feat_type'], \
-                                                                             args_dict['nlp_feat_dir'], args_dict['use_ridge']
+                                                                             args_dict['nlp_feat_dir']
     
         word_CV_ind = TR_to_word_CV_ind(train_ind)
         _,_,tmp_train_features,tmp_test_features = get_nlp_features_fixed_length(layer, seq_len, nlp_feat_type, feat_dir, word_CV_ind)
@@ -156,11 +156,11 @@ def fold_run_class_time_CV_fmri_crossval_ridge(fold_num, data, args_dict, train_
             train_data = np.nan_to_num(zscore(np.nan_to_num(train_data))) # (N_train, n_voxels)
             test_data = np.nan_to_num(zscore(np.nan_to_num(test_data))) # (N_test, n_voxels)
 
-            weights, chosen_lambdas = cross_val_ridge_linear(train_features, train_data, use_ridge, method='plain')
+            weights, chosen_lambdas = cross_val_ridge_linear(args_dict, train_features, train_data, test_features, test_data, method='plain')
             fold_preds = np.dot(test_features, weights)
             del weights # (feat_dim, n_voxels)
         else:
-            fold_preds = cross_val_ridge_nonlinear(fold_num, args_dict, train_features, train_data, test_features, test_data)
+            fold_preds = cross_val_ridge_nonlinear(args_dict, train_features, train_data, test_features, test_data)
             fold_preds = fold_preds.detach().cpu().numpy()
         np.save(fold_preds_path, fold_preds)
     fold_corrs = corr(fold_preds, test_data)

@@ -103,7 +103,7 @@ def kernel_ridge_by_lambda_svd(X, Y, Xval, Yval, lambdas=np.array([0.1,1,10,100,
         error[idx] = 1 - R2(np.dot(Xval,weights),Yval)
     return error
 
-def cross_val_ridge_linear(train_features, train_data, use_ridge, method='plain'):
+def cross_val_ridge_linear(args_dict, train_features, train_data, test_features, test_data, method='plain'):
     ridge_1 = dict(plain = ridge_by_lambda,
                    svd = ridge_by_lambda_svd,
                    kernel_ridge = kernel_ridge_by_lambda,
@@ -115,26 +115,42 @@ def cross_val_ridge_linear(train_features, train_data, use_ridge, method='plain'
                    kernel_ridge_svd = kernel_ridge_svd,
                    ridge_sk = ridge_sk)[method]
 
-    if use_ridge:
+    if args_dict['use_ridge']:
         feat_dim, n_voxels, n_lambdas = train_features.shape[1], train_data.shape[1], lambdas.shape[0]
-        cost_across_splits = np.zeros((n_lambdas, n_voxels))
+        costs_across_splits = np.zeros((n_lambdas, n_voxels))
         kf = KFold(n_splits=n_splits)
 
         for (trn, val) in kf.split(train_data):
             cost = ridge_1(train_features[trn],train_data[trn],
                                 train_features[val],train_data[val],
                                 lambdas=lambdas)
-            cost_across_splits += cost
-
-        argmin_lambda = np.argmin(cost_across_splits,axis = 0)
+            costs_across_splits += cost
+        
+        argmin_lambda = np.argmin(costs_across_splits,axis = 0)
+        for idx, lmbda in enumerate(lambdas):
+            writer.add_histogram('Lambda={}/Total Val Cost'.format(lmbda), costs_across_splits[idx], 0)
+        if args_dict['roi_only']:
+            roi_lambdas = Counter(argmin_lambda)
+        else:
+            rois = np.load('./data/HP_subj_roi_inds.npy', allow_pickle=True)
+            roi_voxels = np.where(rois.item()[args_dict['subject']]['all'] == 1)[0]
+            roi_lambdas = argmin_lambda[roi_voxels]
+        print("ROI Lambda Counts:\n", roi_lambdas)
+        
         weights = np.zeros((feat_dim, n_voxels))
+        errors = np.zeros((train_data.shape[1],))
         for idx_lambda in range(n_lambdas): # this is much faster than iterating over voxels!
             idx_vox = argmin_lambda == idx_lambda
             weights[:,idx_vox] = ridge_2(train_features, train_data[:,idx_vox],lambdas[idx_lambda])
+            errors[idx_vox] = (1 - R2(np.dot(test_features,weights[:,idx_vox]),test_data[:,idx_vox]))
         min_lambdas = np.array([lambdas[i] for i in argmin_lambda])
+        writer.add_histogram('Prediction/Test Cost', errors, 0)
     else:
         lmbda, min_lambdas = 0, np.array([])
         weights = ridge_2(train_features, train_data, lmbda)
+        
+    # End tensorboard logging
+    writer.close()
     return weights, min_lambdas
 
 ################################################
@@ -279,7 +295,7 @@ def ridge_by_lambda_graddescent(split_num, args_dict, X, Y, Xval, Yval):
     del Xval, Yval
     return costs
 
-def cross_val_ridge_nonlinear(fold_num, args_dict, train_features, train_data, test_features, test_data):
+def cross_val_ridge_nonlinear(args_dict, train_features, train_data, test_features, test_data):
     import utils.utils as general_utils # Import here to avoid circular import error
     global writer
     encoding_model, use_ridge = args_dict['encoding_model'], args_dict['use_ridge']

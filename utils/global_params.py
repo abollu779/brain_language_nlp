@@ -3,9 +3,9 @@ import numpy as np
 # Training Routine
 n_folds = 4
 n_splits = 10 # nested CV (inner folds to select optimal lambda)
-n_epochs = 100
-lambdas = np.array([10**i for i in range(-6,10)])
-lrs = np.array([1e-4]*11+[1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10])
+n_epochs = 25
+lambdas = np.array([10**i for i in range(-6,6)])
+lrs = np.array([1e-4]*11+[1e-5, 1e-6])
 
 # Model Architecture
 encoding_model_options = ['linear', 'nonlinear_sharedhidden', 'nonlinear_separatehidden']
