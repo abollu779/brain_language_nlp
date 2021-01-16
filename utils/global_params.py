@@ -15,4 +15,4 @@ encoding_model_options = ['linear', 'nonlinear_sharedhidden', 'nonlinear_sharedh
 # linear: standard linear model
 # nonlinear_sharedhidden: one-hidden layer mlp model for all voxels together; 
 #                         if use_ridge is set, lambda selected for most voxels is the lambda chosen for predictions
-# nonlinear_separatehidden: one-hidden layer mlp model for each voxel
+# nonlinear_sharedhidden_roipartition: one-hidden layer mlp models trained on voxels in each roi at a time.
