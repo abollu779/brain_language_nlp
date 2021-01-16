@@ -12,8 +12,12 @@ class NonlinearEncodingModel(nn.Module):
                 nn.ReLU(),
                 nn.Linear(640, n_voxels)
             )
-        elif encoding_model == 'nonlinear_separatehidden':
-            raise Exception('{} encoding model currently not supported'.format(encoding_model))
+        elif encoding_model == 'nonlinear_sharedhidden_roipartition':
+            self.model = nn.Sequential(
+                nn.Linear(feat_dim, 256),
+                nn.ReLU(),
+                nn.Linear(256, n_voxels)
+            )
         else:
             raise Exception('{} encoding model not recognized'.format(encoding_model))
 

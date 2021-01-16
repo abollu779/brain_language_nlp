@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 from utils.utils import run_class_time_CV_fmri_crossval_ridge
-from utils.global_params import encoding_model_options, n_folds
+from utils.global_params import encoding_model_options, n_folds, roi_keys
 
 if __name__ == '__main__':
     np.random.seed(0)
@@ -44,12 +44,30 @@ if __name__ == '__main__':
 
 
     # loading fMRI data
-    data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
-    if args.roi_only:
-        rois = np.load('./data/HP_subj_roi_inds.npy', allow_pickle=True)
-        data = data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
-    
-    corrs, preds, test_data = run_class_time_CV_fmri_crossval_ridge(data, args_dict)
+    allvox_data = np.load('./data/fMRI/data_subject_{}.npy'.format(args.subject))
+    rois = np.load('./data/HP_subj_roi_inds.npy', allow_pickle=True)
+    if args.encoding_model == 'nonlinear_sharedhidden':
+        if args.roi_only:
+            # Only use ROI voxels
+            data = allvox_data[:, np.where(rois.item()[args.subject]['all'] == 1)[0]]
+        else:
+            data = allvox_data
+        corrs, preds, test_data = run_class_time_CV_fmri_crossval_ridge(data, args_dict)
+    elif args.encoding_model == 'nonlinear_sharedhidden_roipartition':
+        if not args.roi_only:
+            raise Exception('{} encoding model currently can only be used with --roi_only flag'.format(args.encoding_model))
+        n_roivoxels = len(np.where(rois.item()[args.subject]['all'] == 1)[0])
+        corrs, preds, test_data = np.zeros((n_folds, n_roivoxels)), np.zeros((allvox_data.shape[0], n_roivoxels)), np.zeros((allvox_data.shape[0], n_roivoxels))
+        for key in roi_keys:
+            print(key)
+            args_dict['roi_key'] = key
+            data = allvox_data[:, np.where(rois.item()[args.subject][key] == 1)[0]]
+            roi_corrs, roi_preds, roi_test_data = run_class_time_CV_fmri_crossval_ridge(data, args_dict)
+            # Get current ROI indices after translating them to fit all ROI voxels array
+            roi_indices = np.where(rois.item()[args.subject][key][np.where(rois.item()[args.subject]['all'] == 1)[0]] == 1)[0]
+            corrs[:,roi_indices], preds[:,roi_indices], test_data[:,roi_indices] = roi_corrs, roi_preds, roi_test_data
+    else:
+        raise Exception('{} encoding model not recognized'.format(args.encoding_model))
 
     output_path = output_dirname + 'final_predictions.npy'
     print('saving: ' + output_path)

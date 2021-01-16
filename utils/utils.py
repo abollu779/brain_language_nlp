@@ -123,7 +123,12 @@ def prepare_fmri_features(train_features, test_features, word_train_indicator, T
 def fold_run_class_time_CV_fmri_crossval_ridge(fold_num, data, args_dict, train_ind, test_ind, fold_preds_dir,
                                         method = 'kernel_ridge', skip=5):
     start_time = tm.time()
-    fold_preds_path = fold_preds_dir + 'fold{}_predictions.npy'.format(fold_num)
+    if args_dict['encoding_model'] == 'nonlinear_sharedhidden':
+        fold_preds_path = fold_preds_dir + 'fold{}_predictions.npy'.format(fold_num)
+    elif args_dict['encoding_model'] == 'nonlinear_sharedhidden_roipartition':
+        fold_preds_path = fold_preds_dir + '{}_fold{}_predictions.npy'.format(args_dict['roi_key'], fold_num)
+    else:
+        raise Exception('{} encoding model not recognized'.format(args_dict['encoding_model']))
     train_data, test_data = data[train_ind], data[test_ind]
 
     if os.path.isfile(fold_preds_path):

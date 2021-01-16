@@ -136,7 +136,7 @@ def cross_val_ridge_linear(args_dict, train_features, train_data, test_features,
             roi_voxels = np.where(rois.item()[args_dict['subject']]['all'] == 1)[0]
             roi_lambdas = argmin_lambda[roi_voxels]
         print("ROI Lambda Counts:\n", roi_lambdas)
-        
+
         weights = np.zeros((feat_dim, n_voxels))
         errors = np.zeros((train_data.shape[1],))
         for idx_lambda in range(n_lambdas): # this is much faster than iterating over voxels!
@@ -326,10 +326,8 @@ def cross_val_ridge_nonlinear(args_dict, train_features, train_data, test_featur
             roi_lambdas = argmin_lambda[roi_voxels]
         print("ROI Lambda Counts:\n", roi_lambdas)
         most_common_idx = Counter(roi_lambdas).most_common(1)[0][0]
-        if encoding_model=='nonlinear_sharedhidden':
+        if encoding_model=='nonlinear_sharedhidden' or encoding_model=='nonlinear_sharedhidden_roipartition':
             opt_lambda, opt_lr = lambdas[most_common_idx], lrs[most_common_idx]
-        elif encoding_model=='nonlinear_separatehidden':
-            raise Exception('{} encoding model currently not supported'.format(encoding_model))
         else:
             raise Exception('{} encoding model not recognized'.format(encoding_model))
     else:
